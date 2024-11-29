@@ -33,8 +33,6 @@ def scaled_dot_product(
     values = jnp.matmul(attention, v)  # Compute weighted values
     return values, attention
 
-import jax.numpy as jnp
-
 def expand_mask(mask: jnp.ndarray) -> jnp.ndarray:
     """
     Expands a given mask to ensure it has 4 dimensions:
