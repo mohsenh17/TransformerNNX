@@ -28,6 +28,7 @@ def test_scaled_dot_product():
     assert attention.shape == (seq_len, seq_len), "Attention has incorrect shape."
     assert jnp.allclose(jnp.sum(attention, axis=-1), 1), "Attention rows must sum to 1."
 
+#python -m tests.test_scaled_dot_product
 
 if __name__ == "__main__":
     test_scaled_dot_product()
