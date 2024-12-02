@@ -35,8 +35,8 @@ Clone the repository:
 
 ```bash
 Copy code
-git clone https://github.com/mohsenh17/jaxLearning.git
-cd jaxLearning
+git clone https://github.com/mohsenh17/TransformerNNX.git
+cd TransformerNNX
 ```
 Set up a Python environment and install dependencies:
 
