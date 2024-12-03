@@ -26,6 +26,7 @@ flax_project/
 │   ├── test_scaled_dot_product.py             
 │   ├── test_MultiHeadAttention.py              
 │   ├── test_EncoderBlock.py              
+│   ├── test_TransformerEncoder.py        
 ├── main.py                       # Main entry point for training and evaluation
 ├── config.py                     # Configuration settings
 └── README.md                     # Project documentation
