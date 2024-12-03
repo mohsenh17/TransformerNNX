@@ -34,14 +34,12 @@ flax_project/
 Clone the repository:
 
 ```bash
-Copy code
 git clone https://github.com/mohsenh17/TransformerNNX.git
 cd TransformerNNX
 ```
 Set up a Python environment and install dependencies:
 
 ```bash
-Copy code
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
