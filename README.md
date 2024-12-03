@@ -25,6 +25,7 @@ flax_project/
 ├── tests/
 │   ├── test_scaled_dot_product.py             
 │   ├── test_MultiHeadAttention.py              
+│   ├── test_EncoderBlock.py              
 ├── main.py                       # Main entry point for training and evaluation
 ├── config.py                     # Configuration settings
 └── README.md                     # Project documentation
@@ -43,4 +44,12 @@ Set up a Python environment and install dependencies:
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+## Tests
+
+to test each part:
+
+```bash
+python -m pytest tests/*
 ```
