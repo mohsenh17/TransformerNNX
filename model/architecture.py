@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from flax import nnx
 
 from model import utils
@@ -174,3 +174,80 @@ class EncoderBlock(nnx.Module):
         x = x + self.dropout(x)
         x = self.norm2(x)
         return x
+
+
+
+class TransformerEncoder(nnx.Module):
+    """
+    A Transformer encoder consisting of multiple stacked encoder blocks.
+
+    Attributes:
+        blocks (list[EncoderBlock]): List of encoder blocks comprising the Transformer encoder.
+
+    Args:
+        input_dim (int): Dimensionality of the input embeddings.
+        feedforward_dim (int): Dimensionality of the intermediate feedforward layers in each encoder block.
+        num_blocks (int): Number of encoder blocks to stack.
+        dropout_prob (float): Probability of dropout.
+        rngs (nnx.Rngs): Random number generators for reproducibility.
+    """
+
+    def __init__(self, 
+                 input_dim: int, 
+                 feedforward_dim: int, 
+                 num_blocks: int, 
+                 dropout_prob: float, 
+                 *, rngs: nnx.Rngs):    
+        self.blocks = [
+            EncoderBlock(input_dim, feedforward_dim, dropout_prob, rngs=rngs) 
+            for _ in range(num_blocks)
+        ]
+
+    def __call__(self, 
+                 x: jnp.ndarray, 
+                 num_heads: int = 8, 
+                 mask: Optional[jnp.ndarray] = None
+                 ) -> jnp.ndarray:
+        """
+        Forward pass for the Transformer encoder.
+
+        Args:
+            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
+            num_heads (int): Number of attention heads for each block's multi-head attention. Default is 8.
+            mask (Optional[jnp.ndarray]): Optional attention mask of shape 
+                                          (seq_len, seq_len), 
+                                          (batch_size, seq_len, seq_len), 
+                                          or (batch_size, num_heads, seq_len, seq_len).
+
+        Returns:
+            jnp.ndarray: Output tensor of shape (batch_size, seq_len, input_dim).
+        """
+        for block in self.blocks:
+            x = block(x, num_heads=num_heads, mask=mask)
+        return x
+
+    def get_attention_weights(self, 
+                              x: jnp.ndarray, 
+                              num_heads: int = 8, 
+                              mask: Optional[jnp.ndarray] = None
+                              ) -> List[jnp.ndarray]:
+        """
+        Extracts the attention weights from each encoder block.
+
+        Args:
+            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
+            num_heads (int): Number of attention heads for each block's multi-head attention. Default is 8.
+            mask (Optional[jnp.ndarray]): Optional attention mask of shape 
+                                          (seq_len, seq_len), 
+                                          (batch_size, seq_len, seq_len), 
+                                          or (batch_size, num_heads, seq_len, seq_len).
+
+        Returns:
+            List[jnp.ndarray]: List of attention weight tensors from each encoder block. Each tensor has shape 
+                               (batch_size, num_heads, seq_len, seq_len).
+        """
+        attention_weights = []
+        for block in self.blocks:
+            _, attention_weight = block.mha(x, num_heads=num_heads, mask=mask)
+            attention_weights.append(attention_weight)
+        return attention_weights
