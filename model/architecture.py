@@ -138,6 +138,7 @@ class EncoderBlock(nnx.Module):
         self.linear = [
             nnx.Linear(input_dim, feedforward_dim, rngs=rngs),
             nnx.Dropout(dropout_prob, rngs=rngs),
+            nnx.gelu(feedforward_dim),
             nnx.Linear(feedforward_dim, input_dim, rngs=rngs),
         ]
         self.norm1 = nnx.LayerNorm(input_dim, rngs=rngs)
