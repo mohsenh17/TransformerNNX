@@ -109,3 +109,68 @@ class MultiHeadAttention(nnx.Module):
         out = self.out_projection(values)
         
         return out, attention
+
+class EncoderBlock(nnx.Module):
+    """
+    A single Transformer encoder block consisting of multi-head attention, feedforward layers, 
+    layer normalization, and dropout.
+
+    Attributes:
+        mha (MultiHeadAttention): Multi-head attention mechanism.
+        linear (list[nnx.Module]): A list of feedforward layers including two linear transformations and dropout.
+        norm1 (nnx.LayerNorm): Layer normalization after the multi-head attention layer.
+        norm2 (nnx.LayerNorm): Layer normalization after the feedforward layers.
+        dropout (nnx.Dropout): Dropout layer applied after the multi-head attention and feedforward layers.
+    
+    Args:
+        input_dim (int): Dimensionality of the input embeddings.
+        feedforward_dim (int): Dimensionality of the intermediate feedforward layer.
+        dropout_prob (float): Probability of dropout.
+        rngs (nnx.Rngs): Random number generators for reproducibility.
+    """
+
+    def __init__(self, 
+                 input_dim: int, 
+                 feedforward_dim: int, 
+                 dropout_prob: float, 
+                 *, rngs: nnx.Rngs):
+        self.mha = MultiHeadAttention(embed_dim=input_dim, rngs=rngs)
+        self.linear = [
+            nnx.Linear(input_dim, feedforward_dim, rngs=rngs),
+            nnx.Dropout(dropout_prob, rngs=rngs),
+            nnx.Linear(feedforward_dim, input_dim, rngs=rngs),
+        ]
+        self.norm1 = nnx.LayerNorm(input_dim, rngs=rngs)
+        self.norm2 = nnx.LayerNorm(input_dim, rngs=rngs)
+        self.dropout = nnx.Dropout(dropout_prob, rngs=rngs)
+
+    def __call__(self, 
+                 x: jnp.ndarray, 
+                 num_heads: int = 8, 
+                 mask: Optional[jnp.ndarray] = None
+                 ) -> jnp.ndarray:
+        """
+        Forward pass for the Transformer encoder block.
+
+        Args:
+            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
+            num_heads (int): Number of attention heads in the multi-head attention mechanism. Default is 8.
+            mask (Optional[jnp.ndarray]): Optional attention mask of shape 
+                                          (seq_len, seq_len), 
+                                          (batch_size, seq_len, seq_len), 
+                                          or (batch_size, num_heads, seq_len, seq_len).
+
+        Returns:
+            jnp.ndarray: Output tensor of shape (batch_size, seq_len, input_dim).
+        """
+        # Multi-Head Attention with residual connection and layer norm
+        mha_out, _ = self.mha(x, num_heads=num_heads, mask=mask)
+        x = x + self.dropout(mha_out)
+        x = self.norm1(x)
+        
+        # Feedforward network with residual connection and layer norm
+        for l in self.linear:
+            x = l(x)
+        x = x + self.dropout(x)
+        x = self.norm2(x)
+        return x
