@@ -252,3 +252,67 @@ class TransformerEncoder(nnx.Module):
             _, attention_weight = block.mha(x, num_heads=num_heads, mask=mask)
             attention_weights.append(attention_weight)
         return attention_weights
+
+
+class PositionalEncoding(nnx.Module):
+    """
+    A module for computing positional encodings for input sequences.
+    This is typically used in transformer models to provide information about
+    the relative or absolute position of tokens in a sequence.
+
+    Args:
+        d_model (int): The dimension of the model (embedding size).
+        max_seq_len (int): The maximum sequence length that the positional encodings
+                           will support.
+        rngs (nnx.Rngs): Random number generators for reproducibility.
+    
+    Attributes:
+        pe (jnp.ndarray): The computed positional encodings of shape (1, max_seq_len, d_model).
+
+    Methods:
+        __call__(x: jnp.ndarray) -> jnp.ndarray:
+            Adds the positional encodings to the input sequence.
+    """
+    
+    def __init__(self, 
+                 d_model: int, 
+                 max_seq_len: int, 
+                 *, rngs: nnx.Rngs):
+        """
+        Initializes the PositionalEncoding module.
+
+        Args:
+            d_model (int): The dimension of the model (embedding size).
+            max_seq_len (int): The maximum sequence length for which positional
+                               encodings are computed.
+            rngs (nnx.Rngs): Random number generators for reproducibility.
+        """
+        # Initialize positional encoding array
+        pe = jnp.zeros((max_seq_len, d_model))
+        
+        # Create position indices for the sequence
+        position = jnp.arange(0, max_seq_len, dtype=jnp.float32)[:, jnp.newaxis]
+        
+        # Calculate the division term for the sine and cosine functions
+        div_term = jnp.exp(jnp.arange(0, d_model, 2) * (jnp.log(10000) / d_model)) # exp(log(x)) = x !
+        
+        # Apply the sine and cosine functions to even and odd indices
+        pe = pe.at[:, 0::2].set(jnp.sin(position / div_term))
+        pe =pe.at[:, 1::2].set(jnp.cos(position / div_term))
+        
+        # Expand the positional encoding to have a batch dimension
+        self.pe = jnp.expand_dims(pe, axis=0)
+
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        """
+        Adds the positional encodings to the input sequence.
+
+        Args:
+            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, d_model).
+
+        Returns:
+            jnp.ndarray: Output tensor with positional encodings added, of shape
+                         (batch_size, seq_len, d_model).
+        """
+        # Add positional encodings to the input sequence
+        return x + self.pe[:, :x.shape[1]]
