@@ -14,7 +14,7 @@ The codebase is designed to demonstrate modularity and scalability, making it ea
 
 ## Repository Structure
 ```bash
-flax_project/
+TransformerNNX/
 ├── model/
 │   ├── __init__.py               # Module initialization
 │   ├── architecture.py           # Neural network architectures 
@@ -39,6 +39,8 @@ flax_project/
 │   ├── test_Transformer.py        
 │   ├── test_TransformerEncoder.py        
 │   ├── test_TransformerDecoder.py        
+├── tasks/                        # Task-specific logics
+│   ├── __init__.py               # Module initialization
 ├── main.py                       # Main entry point for training and evaluation
 ├── config.py                     # Configuration settings
 └── README.md                     # Project documentation
