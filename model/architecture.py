@@ -316,3 +316,81 @@ class PositionalEncoding(nnx.Module):
         """
         # Add positional encodings to the input sequence
         return x + self.pe[:, :x.shape[1]]
+
+
+class CrossMultiHeadAttention(nnx.Module):
+    """
+    Cross-attention mechanism using multi-head attention.
+    
+    This module computes attention between a query input (`x`) and key-value input (`kv`).
+    It's often used in transformers for tasks like encoder-decoder attention.
+
+    Args:
+        embed_dim (int): Dimensionality of the input embeddings.
+        rngs (nnx.Rngs): Random number generators for reproducibility.
+    
+    Methods:
+        __call__(x: jnp.ndarray, kv: jnp.ndarray, num_heads: Optional[int], mask: Optional[jnp.ndarray]) -> Tuple[jnp.ndarray, jnp.ndarray]:
+            Computes the cross-attention between `x` and `kv`.
+    """
+    def __init__(self, 
+                 embed_dim: int, 
+                 *, rngs: nnx.Rngs) -> None:
+        """
+        Initializes the CrossMultiHeadAttention module.
+
+        Args:
+            embed_dim (int): The dimensionality of input embeddings.
+            rngs (nnx.Rngs): Random number generators for reproducibility.
+        """
+        self.kv_projection = nnx.Linear(embed_dim, 2 * embed_dim, rngs=rngs)
+        self.q_projection = nnx.Linear(embed_dim, embed_dim, rngs=rngs)
+        self.out_projection = nnx.Linear(embed_dim, embed_dim, rngs=rngs)
+        
+    def __call__(self, 
+                 x: jnp.ndarray, 
+                 kv: jnp.ndarray, 
+                 num_heads: int, 
+                 mask: Optional[jnp.ndarray] = None
+                 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        """
+        Applies cross-attention between the query input (`x`) and key-value input (`kv`).
+
+        Args:
+            x (jnp.ndarray): Query tensor of shape (batch_size, seq_len, embed_dim).
+            kv (jnp.ndarray): Key-value tensor of shape (batch_size, seq_len, embed_dim).
+            num_heads (Optional[int]): Number of attention heads. Defaults to 1.
+            mask (Optional[jnp.ndarray]): Optional attention mask of shape (batch_size, seq_len, seq_len).
+
+        Returns:
+            Tuple[jnp.ndarray, jnp.ndarray]: 
+                - Attention output tensor of shape (batch_size, seq_len, embed_dim).
+                - Attention weights tensor of shape (batch_size, num_heads, seq_len, seq_len).
+        """
+        batch_size, seq_len, embed_dim = x.shape
+        assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
+        
+        # Project queries
+        q = self.q_projection(x)
+        
+        # Project keys and values
+        kv = self.kv_projection(kv)
+        kv = kv.reshape(batch_size, seq_len, num_heads, -1)  # Split heads
+        kv = kv.transpose(0, 2, 1, 3)  # Shape: (batch_size, num_heads, seq_len, d_k)
+        k, v = jnp.array_split(kv, 2, axis=-1)  # Split into key and value
+        
+        # Split and reshape queries
+        q = q.reshape(batch_size, seq_len, num_heads, -1)
+        q = q.transpose(0, 2, 1, 3)  # Shape: (batch_size, num_heads, seq_len, d_k)
+
+        # Compute attention
+        values, attention = scaled_dot_product(q, k, v, mask)
+        
+        # Reshape the output
+        values = values.transpose(0, 2, 1, 3)  # Shape: (batch_size, seq_len, num_heads, d_k)
+        values = values.reshape(batch_size, seq_len, embed_dim)  # Merge heads
+        
+        # Project output
+        values = self.out_projection(values)
+        
+        return values, attention
