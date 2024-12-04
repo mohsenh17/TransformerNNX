@@ -1,4 +1,4 @@
-# Transformer with flax nnx
+# Transformer with flax.nnx
 
 ## Overview
 This repository contains a collection of deep learning projects and experiments built using Flax and JAX. The primary focus is on implementing, training, and evaluating Transformer architecture.
@@ -36,6 +36,7 @@ flax_project/
 │   ├── test_MultiHeadAttention.py              
 │   ├── test_PositionalEncoding.py        
 │   ├── test_scaled_dot_product.py             
+│   ├── test_Transformer.py        
 │   ├── test_TransformerEncoder.py        
 │   ├── test_TransformerDecoder.py        
 ├── main.py                       # Main entry point for training and evaluation
