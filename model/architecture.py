@@ -170,9 +170,10 @@ class EncoderBlock(nnx.Module):
         x = self.norm1(x)
         
         # Feedforward network with residual connection and layer norm
+        linear_out = x
         for l in self.linear:
-            x = l(x)
-        x = x + self.dropout(x)
+            linear_out = l(linear_out)
+        x = x + self.dropout(linear_out)
         x = self.norm2(x)
         return x
 
