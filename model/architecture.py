@@ -396,3 +396,79 @@ class CrossMultiHeadAttention(nnx.Module):
         
         return values, attention
 
+
+class DecoderBlock(nnx.Module):
+    """
+    A single block for the transformer decoder.
+
+    This module includes:
+      - Self-attention.
+      - Cross-attention between the decoder input and encoder output.
+      - Feedforward layers with residual connections and normalization.
+
+    Args:
+        input_dim (int): The dimensionality of input embeddings.
+        feedforward_dim (int): The dimensionality of the feedforward network.
+        dropout_prob (float): Dropout probability for regularization.
+        rngs (nnx.Rngs): Random number generators for reproducibility.
+
+    Methods:
+        __call__(x, encoder_kv, num_heads, mask) -> jnp.ndarray:
+            Performs forward computation of the decoder block.
+    """
+    def __init__(self, 
+                 input_dim: int, 
+                 feedforward_dim: int,
+                 dropout_prob: float,
+                 *, rngs: nnx.Rngs) -> None:
+        """
+        Initializes the DecoderBlock module.
+        """
+        self.mha = MultiHeadAttention(embed_dim=input_dim, rngs=rngs)  # Self-attention
+        self.cmha = CrossMultiHeadAttention(embed_dim=input_dim, rngs=rngs)  # Cross-attention
+        self.linear = [
+            nnx.Linear(input_dim, feedforward_dim, rngs=rngs),
+            nnx.Dropout(dropout_prob, rngs=rngs),
+            nnx.Linear(feedforward_dim, input_dim, rngs=rngs),
+        ]
+        self.norm1 = nnx.LayerNorm(input_dim, rngs=rngs)
+        self.norm2 = nnx.LayerNorm(input_dim, rngs=rngs)
+        self.norm3 = nnx.LayerNorm(input_dim, rngs=rngs)
+        self.dropout = nnx.Dropout(dropout_prob, rngs=rngs)
+        
+    def __call__(self, 
+                 x: jnp.ndarray, 
+                 encoder_kv: jnp.ndarray, 
+                 num_heads: int, 
+                 mask: Optional[jnp.ndarray] = None
+                 ) -> jnp.ndarray:
+        """
+        Forward pass for the DecoderBlock.
+
+        Args:
+            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
+            encoder_kv (jnp.ndarray): Encoder output used as key-value pairs for cross-attention.
+            num_heads (int): Number of attention heads.
+            mask (Optional[jnp.ndarray]): Optional mask for attention.
+
+        Returns:
+            jnp.ndarray: Output tensor of shape (batch_size, seq_len, input_dim).
+        """
+        # Self-attention
+        mha_out, _ = self.mha(x, num_heads=num_heads, mask=mask)
+        x = x + self.dropout(mha_out)
+        x = self.norm1(x)
+        
+        # Cross-attention
+        cmha_out, _ = self.cmha(x, encoder_kv, num_heads=num_heads, mask=mask)
+        x = x + self.dropout(cmha_out)
+        x = self.norm2(x)
+        
+        # Feedforward
+        linear_out = x
+        for l in self.linear:
+            linear_out = l(linear_out)
+        linear_out = nnx.gelu(linear_out)
+        x = x + self.dropout(linear_out)
+        x = self.norm3(x)
+        return x
