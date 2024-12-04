@@ -533,8 +533,8 @@ class TransformerDecoder(nnx.Module):
         """
         for block in self.blocks:
             x = block(x, encoder_kv, num_heads, mask)
-        x = self.out_projection(x)
-        x = nnx.softmax(x, axis=-1)  # Optional final softmax
+        #x = self.out_projection(x)
+        #x = nnx.softmax(x, axis=-1)  # Optional final softmax
         return x
     
     def get_mha_attention_weights(self, 
@@ -582,4 +582,61 @@ class TransformerDecoder(nnx.Module):
             _, attention_weight = block.cmha(x, encoder_kv, num_heads=num_heads, mask=mask)
             attention_weights.append(attention_weight)
         return attention_weights
+
+
+class Transformer(nnx.Module):
+    """
+    Transformer module combining the encoder and decoder.
+
+    Args:
+        input_dim (int): Dimensionality of the input embeddings.
+        feedforward_dim (int): Dimensionality of the feedforward network.
+        num_blocks (int): Number of encoder and decoder blocks.
+        dropout_prob (float): Dropout probability for regularization.
+        rngs (nnx.Rngs): Random number generators for reproducibility.
+
+    Methods:
+        __call__(x, num_heads, mask) -> jnp.ndarray:
+            Performs the forward computation through the Transformer.
+    """
+    def __init__(self, 
+                 input_dim: int, 
+                 feedforward_dim: int, 
+                 num_blocks: int, 
+                 dropout_prob: float, 
+                 *, rngs: nnx.Rngs) -> None:
+        """
+        Initializes the Transformer module.
+        """
+        self.encoder = TransformerEncoder(input_dim, feedforward_dim, num_blocks, dropout_prob, rngs=rngs)
+        self.decoder = TransformerDecoder(input_dim, feedforward_dim, num_blocks, dropout_prob, rngs=rngs)  
+        self.out_projection = nnx.Linear(input_dim, input_dim, rngs=rngs)        
+
+    def __call__(self, 
+                 x: jnp.ndarray, 
+                 num_heads: int, 
+                 mask: Optional[jnp.ndarray] = None
+                 ) -> jnp.ndarray:
+        """
+        Forward pass for the Transformer.
+
+        Args:
+            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
+            num_heads (int): Number of attention heads.
+            mask (Optional[jnp.ndarray]): Optional mask for attention.
+
+        Returns:
+            jnp.ndarray: Output tensor after applying the Transformer.
+        """
+        # Encoder forward pass
+        encoder_kv = self.encoder(x, num_heads, mask)
+        
+        # Decoder forward pass using encoder outputs
+        x = self.decoder(x, encoder_kv, num_heads, mask)
+        
+        # Final projection
+        x = self.out_projection(x)
+        x = nnx.softmax(x, axis=-1)  # Optional softmax at the end
+        
+        return x
 
