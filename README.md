@@ -23,11 +23,14 @@ flax_project/
 ├── evaluation/
 │   └── evaluator.py              # Functions for model evaluation
 ├── tests/
-│   ├── test_scaled_dot_product.py             
-│   ├── test_MultiHeadAttention.py              
+│   ├── test_CrossMultiHeadAttention.py             
+│   ├── test_DecoderBlock.py             
 │   ├── test_EncoderBlock.py              
-│   ├── test_TransformerEncoder.py        
+│   ├── test_MultiHeadAttention.py              
 │   ├── test_PositionalEncoding.py        
+│   ├── test_scaled_dot_product.py             
+│   ├── test_TransformerEncoder.py        
+│   ├── test_TransformerDecoder.py        
 ├── main.py                       # Main entry point for training and evaluation
 ├── config.py                     # Configuration settings
 └── README.md                     # Project documentation
