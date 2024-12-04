@@ -472,3 +472,149 @@ class DecoderBlock(nnx.Module):
         x = x + self.dropout(linear_out)
         x = self.norm3(x)
         return x
+    
+
+
+class TransformerDecoder(nnx.Module):
+    """
+    Transformer decoder module consisting of multiple decoder blocks and an output projection layer.
+
+    Args:
+        input_dim (int): Dimensionality of the input embeddings.
+        feedforward_dim (int): Dimensionality of the feedforward network.
+        num_blocks (int): Number of decoder blocks.
+        dropout_prob (float): Dropout probability for regularization.
+        rngs (nnx.Rngs): Random number generators for reproducibility.
+
+    Methods:
+        __call__(x, encoder_kv, num_heads, mask) -> jnp.ndarray:
+            Performs the forward computation through the decoder.
+
+        get_mha_attention_weights(x, num_heads, mask) -> List[jnp.ndarray]:
+            Returns a list of self-attention weight matrices from all decoder blocks.
+
+        get_cmha_attention_weights(x, encoder_kv, num_heads, mask) -> List[jnp.ndarray]:
+            Returns a list of cross-attention weight matrices from all decoder blocks.
+    """
+    def __init__(self, 
+                 input_dim: int, 
+                 feedforward_dim: int,
+                 num_blocks: int,
+                 dropout_prob: float,
+                 *, rngs: nnx.Rngs) -> None:
+        """
+        Initializes the TransformerDecoder module.
+        """
+        self.blocks = [
+            DecoderBlock(input_dim, feedforward_dim, dropout_prob, rngs=rngs)
+            for _ in range(num_blocks)
+        ]
+        self.out_projection = nnx.Linear(input_dim, input_dim, rngs=rngs)
+        
+    def __call__(self, 
+                 x: jnp.ndarray, 
+                 encoder_kv: jnp.ndarray, 
+                 num_heads: int, 
+                 mask: Optional[jnp.ndarray] = None
+                 ) -> jnp.ndarray:
+        """
+        Forward pass for the TransformerDecoder.
+
+        Args:
+            x (jnp.ndarray): Decoder input tensor of shape (batch_size, seq_len, input_dim).
+            encoder_kv (jnp.ndarray): Encoder output used as key-value pairs for cross-attention.
+            num_heads (int): Number of attention heads.
+            mask (Optional[jnp.ndarray]): Optional mask for attention.
+
+        Returns:
+            jnp.ndarray: Output tensor after applying the decoder.
+        """
+        for block in self.blocks:
+            x = block(x, encoder_kv, num_heads, mask)
+        x = self.out_projection(x)
+        x = nnx.softmax(x, axis=-1)  # Optional final softmax
+        return x
+    
+    def get_mha_attention_weights(self, 
+                                  x: jnp.ndarray, 
+                                  num_heads: int = 8, 
+                                  mask: Optional[jnp.ndarray] = None
+                                  ) -> List[jnp.ndarray]:
+        """
+        Collects self-attention weights from all decoder blocks.
+
+        Args:
+            x (jnp.ndarray): Decoder input tensor.
+            num_heads (int): Number of attention heads.
+            mask (Optional[jnp.ndarray]): Optional attention mask.
+
+        Returns:
+            List[jnp.ndarray]: List of self-attention weights from all blocks.
+        """
+        attention_weights = []
+        for block in self.blocks:
+            _, attention_weight = block.mha(x, num_heads=num_heads, mask=mask)
+            attention_weights.append(attention_weight)
+        return attention_weights
+    
+    def get_cmha_attention_weights(self, 
+                                   x: jnp.ndarray, 
+                                   encoder_kv: jnp.ndarray,
+                                   num_heads: int = 8, 
+                                   mask: Optional[jnp.ndarray] = None
+                                   ) -> List[jnp.ndarray]:
+        """
+        Collects cross-attention weights from all decoder blocks.
+
+        Args:
+            x (jnp.ndarray): Decoder input tensor.
+            encoder_kv (jnp.ndarray): Encoder output used for cross-attention.
+            num_heads (int): Number of attention heads.
+            mask (Optional[jnp.ndarray]): Optional attention mask.
+
+        Returns:
+            List[jnp.ndarray]: List of cross-attention weights from all blocks.
+        """
+        attention_weights = []
+        for block in self.blocks:
+            _, attention_weight = block.cmha(x, encoder_kv, num_heads=num_heads, mask=mask)
+            attention_weights.append(attention_weight)
+        return attention_weights
+
+
+def test_transformer_decoder():
+    # Parameters
+    input_dim = 16
+    feedforward_dim = 64
+    num_blocks = 2
+    seq_len = 10
+    batch_size = 2
+    num_heads = 4
+    dropout_prob = 0.1
+
+    # Input tensors
+    x = jnp.ones((batch_size, seq_len, input_dim))  # Decoder input
+    encoder_kv = jnp.ones((batch_size, seq_len, input_dim))  # Encoder output
+
+    # Initialize the TransformerDecoder
+    decoder = TransformerDecoder(
+        input_dim=input_dim,
+        feedforward_dim=feedforward_dim,
+        num_blocks=num_blocks,
+        dropout_prob=dropout_prob,
+        rngs=nnx.Rngs(0),
+    )
+
+    # Forward pass
+    output = decoder(x, encoder_kv, num_heads=num_heads)
+    assert output.shape == (batch_size, seq_len, input_dim), "Output shape mismatch"
+
+    # Test self-attention weights
+    mha_weights = decoder.get_mha_attention_weights(x, num_heads=num_heads)
+    assert len(mha_weights) == num_blocks, "Mismatch in number of self-attention weights"
+
+    # Test cross-attention weights
+    cmha_weights = decoder.get_cmha_attention_weights(x, encoder_kv, num_heads=num_heads)
+    assert len(cmha_weights) == num_blocks, "Mismatch in number of cross-attention weights"
+
+test_transformer_decoder()
