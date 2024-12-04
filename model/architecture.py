@@ -370,6 +370,8 @@ class CrossMultiHeadAttention(nnx.Module):
         """
         batch_size, seq_len, embed_dim = x.shape
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
+        if mask is not None:
+            mask = utils.expand_mask(mask)  # Ensure mask is in the correct 4D format
         
         # Project queries
         q = self.q_projection(x)
