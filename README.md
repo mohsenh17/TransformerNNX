@@ -27,6 +27,7 @@ flax_project/
 │   ├── test_MultiHeadAttention.py              
 │   ├── test_EncoderBlock.py              
 │   ├── test_TransformerEncoder.py        
+│   ├── test_PositionalEncoding.py        
 ├── main.py                       # Main entry point for training and evaluation
 ├── config.py                     # Configuration settings
 └── README.md                     # Project documentation
