@@ -5,6 +5,13 @@ This repository contains a collection of deep learning projects and experiments 
 
 The codebase is designed to demonstrate modularity and scalability, making it easy to extend and adapt for different use cases.
 
+## Features
+- **Custom Transformer Architecture:** Includes MultiHeadAttention, CrossMultiHeadAttention, PositionalEncoding, Decoder, and Encoder blocks.
+- **Modular Codebase:** Clear separation between model definition, data loading, training, and evaluation.
+- **Tests Included:** Unit tests for each core module.
+- **Checkpointing:** Save and load models efficiently with robust checkpoint management.
+- **Configurable Design:** Easily adjust hyperparameters, architecture, and training options via config.py.
+
 ## Repository Structure
 ```bash
 flax_project/
