@@ -138,7 +138,6 @@ class EncoderBlock(nnx.Module):
         self.linear = [
             nnx.Linear(input_dim, feedforward_dim, rngs=rngs),
             nnx.Dropout(dropout_prob, rngs=rngs),
-            nnx.gelu(feedforward_dim),
             nnx.Linear(feedforward_dim, input_dim, rngs=rngs),
         ]
         self.norm1 = nnx.LayerNorm(input_dim, rngs=rngs)
@@ -173,6 +172,7 @@ class EncoderBlock(nnx.Module):
         linear_out = x
         for l in self.linear:
             linear_out = l(linear_out)
+        linear_out = nnx.gelu(linear_out)
         x = x + self.dropout(linear_out)
         x = self.norm2(x)
         return x
@@ -395,3 +395,4 @@ class CrossMultiHeadAttention(nnx.Module):
         values = self.out_projection(values)
         
         return values, attention
+
