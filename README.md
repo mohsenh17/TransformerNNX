@@ -22,14 +22,13 @@ TransformerNNX/
 ├── data/
 │   ├── __init__.py               # Module initialization
 │   ├── reverse_task_data.py      # reverse list dataset
-│   └── loader.py                 # Data loading and preprocessing
 ├── training/
 │   ├── __init__.py               # Module initialization
 │   └── trainer.py                # Training logic and loops
 ├── checkpoints/
-│   └── checkpoint_manager.py     # Save and load model checkpoints
+│   └── 🚧 checkpoint_manager.py     # [TODO] Save and load model checkpoints
 ├── evaluation/
-│   └── evaluator.py              # Functions for model evaluation
+│   └── 🚧 evaluator.py              # [TODO] Functions for model evaluation
 ├── tests/
 │   ├── test_CrossMultiHeadAttention.py             
 │   ├── test_DecoderBlock.py             
@@ -42,6 +41,7 @@ TransformerNNX/
 │   ├── test_TransformerDecoder.py        
 ├── tasks/                        # Task-specific logics
 │   ├── __init__.py               # Module initialization
+│   ├── reverse_task.py           # reverse input list
 ├── main.py                       # Main entry point for training and evaluation
 ├── config.py                     # Configuration settings
 └── README.md                     # Project documentation
