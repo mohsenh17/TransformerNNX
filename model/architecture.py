@@ -596,7 +596,7 @@ class Transformer(nnx.Module):
         rngs (nnx.Rngs): Random number generators for reproducibility.
 
     Methods:
-        __call__(x, num_heads, mask) -> jnp.ndarray:
+        __call__(x, y, num_heads, mask=None) -> jnp.ndarray:
             Performs the forward computation through the Transformer.
     """
     def __init__(self, 
@@ -608,12 +608,25 @@ class Transformer(nnx.Module):
         """
         Initializes the Transformer module.
         """
-        self.encoder = TransformerEncoder(input_dim, feedforward_dim, num_blocks, dropout_prob, rngs=rngs)
-        self.decoder = TransformerDecoder(input_dim, feedforward_dim, num_blocks, dropout_prob, rngs=rngs)  
-        self.out_projection = nnx.Linear(input_dim, input_dim, rngs=rngs)        
+        self.encoder = TransformerEncoder(
+            input_dim=input_dim, 
+            feedforward_dim=feedforward_dim, 
+            num_blocks=num_blocks, 
+            dropout_prob=dropout_prob, 
+            rngs=rngs
+        )
+        self.decoder = TransformerDecoder(
+            input_dim=input_dim, 
+            feedforward_dim=feedforward_dim, 
+            num_blocks=num_blocks, 
+            dropout_prob=dropout_prob, 
+            rngs=rngs
+        )
+        self.out_projection = nnx.Linear(input_dim, input_dim, rngs=rngs)
 
     def __call__(self, 
                  x: jnp.ndarray, 
+                 y: jnp.ndarray, 
                  num_heads: int, 
                  mask: Optional[jnp.ndarray] = None
                  ) -> jnp.ndarray:
@@ -621,20 +634,20 @@ class Transformer(nnx.Module):
         Forward pass for the Transformer.
 
         Args:
-            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
+            x (jnp.ndarray): Input tensor (source sequence) of shape (batch_size, src_seq_len, input_dim).
+            y (jnp.ndarray): Target tensor (shifted target sequence) of shape (batch_size, tgt_seq_len, input_dim).
             num_heads (int): Number of attention heads.
             mask (Optional[jnp.ndarray]): Optional mask for attention.
 
         Returns:
             jnp.ndarray: Output tensor after applying the Transformer.
         """
-        # Encoder forward pass
-        encoder_kv = self.encoder(x, num_heads, mask)
+        # Pass through encoder
+        encoder_kv = self.encoder(x, num_heads)
         
-        # Decoder forward pass using encoder outputs
-        x = self.decoder(x, encoder_kv, num_heads, mask)
+        # Pass through decoder with encoder outputs
+        decoder_output = self.decoder(y, encoder_kv, num_heads, mask)
         
-        # Final projection
-        x = self.out_projection(x)
-        return x
-
+        # Final linear projection
+        output = self.out_projection(decoder_output)
+        return output
