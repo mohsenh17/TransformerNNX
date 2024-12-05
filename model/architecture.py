@@ -636,7 +636,5 @@ class Transformer(nnx.Module):
         
         # Final projection
         x = self.out_projection(x)
-        x = nnx.softmax(x, axis=-1)  # Optional softmax at the end
-        
         return x
 
