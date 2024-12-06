@@ -2,10 +2,12 @@ import torch
 from torch.utils.data import DataLoader
 from data.reverse_task_data import ReverseTaskDataset, custom_collate_fn
 from tasks.reverse_task import ReverseTaskModel
-from training.trainer import train_step
+from training.trainer import train_step, pred_step
 from flax import nnx
 import optax
 import numpy as np
+
+import jax.numpy as jnp
 
 # Configuration
 vocab_size = 19
@@ -26,7 +28,7 @@ metrics = nnx.MultiMetric(loss=nnx.metrics.Average('loss'))
 
 # Training loop
 metrics_history = {'train_loss': []}
-num_epochs = 40
+num_epochs = 1000
 for epoch in range(num_epochs):
     for batch in train_ds:
         loss, logits = train_step(model, optimizer, metrics, batch, mask)
@@ -34,3 +36,16 @@ for epoch in range(num_epochs):
         metrics_history[f'train_{metric}'].append(value)
     metrics.reset()
     print(f"[train] epoch: {epoch + 1}/{num_epochs}, loss: {metrics_history['train_loss'][-1]:.4f}")
+
+# Testing loop
+test_ds = DataLoader(test_set, batch_size=64, shuffle=True, drop_last=True, collate_fn=lambda batch: custom_collate_fn(batch, vocab_size))
+all_preds = []
+all_labels = []
+for batch in test_ds:
+    all_labels.append(np.argmax(batch['targets'], axis=-1))
+    preds = pred_step(model, batch)
+    print("preds:")
+    print(preds)
+    print("labels:")
+    print(np.argmax(batch['targets'], axis=-1))
+    all_preds.append(preds)
