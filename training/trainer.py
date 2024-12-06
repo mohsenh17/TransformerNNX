@@ -1,7 +1,9 @@
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, List
 from flax import nnx
 import optax
 import jax.numpy as jnp
+import jax
+import numpy as np
 
 def loss_fn(model: nnx.Module, 
             encoder_inputs: jnp.ndarray, 
@@ -87,10 +89,41 @@ def eval_step(model: nnx.Module,
 
 @nnx.jit
 def pred_step(model: nnx.Module, 
-              batch: Dict[str, jnp.ndarray]) -> jnp.ndarray:
+              batch: Dict[str, jnp.ndarray], 
+              max_seq_len: int = 10) -> jnp.ndarray:
     """
-    not Implemented
+    Performs autoregressive prediction using the given transformer model.
+
+    Args:
+        model (nnx.Module): The transformer model with encoder and decoder modules.
+        batch (Dict[str, jnp.ndarray]): A batch of input data containing:
+            - 'encoder_inputs' (jnp.ndarray): Input sequences for the encoder.
+        max_seq_len (int, optional): Maximum length of the output sequence to generate. Defaults to 10.
+
+    Returns:
+        jnp.ndarray: A tensor of shape `(batch_size, max_seq_len)` containing the predicted token indices.
     """
-    raise NotImplementedError
-    logits = model(batch['features'])
-    return nnx.sigmoid(logits)
+    batch_size, _, embed_dim = batch['encoder_inputs'].shape
+
+    # Initialize predictions array and the initial decoder input (start token embedding)
+    preds = jnp.zeros((batch_size, max_seq_len), dtype=jnp.int32)
+    y = jnp.zeros((batch_size, 1, embed_dim))  # Start token for decoder input
+
+    # Encoder output (fixed for the entire sequence generation)
+    encoder_output = model.transformer.encoder(batch['encoder_inputs'], num_heads=2)
+
+    for t in range(max_seq_len):
+        # Decoder processes the current sequence
+        decoder_output = model.transformer.decoder(y, encoder_output, num_heads=2)
+
+        # Predict the next token (argmax over vocabulary dimension)
+        next_token = decoder_output[:, -1, :].argmax(axis=-1)
+
+        # Store the predicted token
+        preds = preds.at[:, t].set(next_token)
+
+        # Update decoder input for the next time step
+        next_token_embedding = jnp.eye(embed_dim)[next_token]  # One-hot embedding
+        y = jnp.concatenate([y, next_token_embedding[:, None, :]], axis=1)
+
+    return preds
