@@ -462,7 +462,8 @@ class DecoderBlock(nnx.Module):
         x = self.norm1(x)
         
         # Cross-attention
-        cmha_out, _ = self.cmha(x, encoder_kv, num_heads=num_heads, mask=mask)
+        #cmha_out, _ = self.cmha(x, encoder_kv, num_heads=num_heads, mask=mask)
+        cmha_out, _ = self.cmha(x, encoder_kv, num_heads=num_heads)
         x = x + self.dropout(cmha_out)
         x = self.norm2(x)
         
