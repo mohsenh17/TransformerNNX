@@ -10,8 +10,9 @@ import numpy as np
 # Configuration
 vocab_size = 19
 seq_length = 10
+target_seq_length = 10
 batch_size = 32
-mask = np.tril(np.ones((seq_length, seq_length)), k=0)
+mask = np.tril(np.ones((target_seq_length, target_seq_length)), k=0)
 
 # Dataset
 dataset = ReverseTaskDataset(num_samples=1000, seq_length=seq_length, vocab_size=vocab_size)
