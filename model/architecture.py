@@ -378,7 +378,7 @@ class CrossMultiHeadAttention(nnx.Module):
         
         # Project keys and values
         kv = self.kv_projection(kv)
-        kv = kv.reshape(batch_size, seq_len, num_heads, -1)  # Split heads
+        kv = kv.reshape(batch_size, -1, num_heads, 2*embed_dim // num_heads)
         kv = kv.transpose(0, 2, 1, 3)  # Shape: (batch_size, num_heads, seq_len, d_k)
         k, v = jnp.array_split(kv, 2, axis=-1)  # Split into key and value
         
