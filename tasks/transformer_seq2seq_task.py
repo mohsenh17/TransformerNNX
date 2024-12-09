@@ -22,7 +22,8 @@ class Seq2SeqTaskModel(nnx.Module):
         transformer (Transformer): The underlying Transformer model.
     """
     def __init__(self, 
-                 input_dim: int, 
+                 input_dim: int,
+                 embed_dim:int, 
                  feedforward_dim: int, 
                  num_blocks: int, 
                  dropout_prob: float, 
@@ -37,7 +38,9 @@ class Seq2SeqTaskModel(nnx.Module):
             dropout_prob (float): Dropout probability for Transformer layers.
             rngs (nnx.Rngs): Random number generators for initialization.
         """
-        self.transformer = Transformer(input_dim, feedforward_dim, num_blocks, dropout_prob, rngs=rngs)
+        self.embd_projection = nnx.Linear(input_dim, embed_dim, rngs=rngs)
+        self.transformer = Transformer(embed_dim, feedforward_dim, num_blocks, dropout_prob, rngs=rngs)
+        self.output_projection = nnx.Linear(embed_dim, input_dim, rngs=rngs)
 
     def __call__(self, 
                  x: jnp.ndarray, 
@@ -61,4 +64,8 @@ class Seq2SeqTaskModel(nnx.Module):
         Returns:
             jnp.ndarray: Output logits, shape `(batch_size, tgt_seq_length, input_dim)`.
         """
-        return self.transformer(x, y, num_heads, mask)
+        x = self.embd_projection(x)
+        y = self.embd_projection(y)
+        out = self.transformer(x, y, num_heads, mask)
+        out = self.output_projection(out)
+        return out

@@ -90,6 +90,7 @@ def eval_step(model: nnx.Module,
 @nnx.jit
 def pred_step(model: nnx.Module, 
               batch: Dict[str, jnp.ndarray], 
+              embed_dim: int = 100,
               max_seq_len: int = 10) -> jnp.ndarray:
     """
     Performs autoregressive prediction using the given transformer model.
@@ -103,27 +104,29 @@ def pred_step(model: nnx.Module,
     Returns:
         jnp.ndarray: A tensor of shape `(batch_size, max_seq_len)` containing the predicted token indices.
     """
-    batch_size, _, embed_dim = batch['encoder_inputs'].shape
+    batch_size, _, input_dim = batch['encoder_inputs'].shape
 
     # Initialize predictions array and the initial decoder input (start token embedding)
     preds = jnp.zeros((batch_size, max_seq_len), dtype=jnp.int32)
-    y = jnp.zeros((batch_size, 1, embed_dim))  # Start token for decoder input
+    y = jnp.zeros((batch_size, 1, input_dim))  # Start token for decoder input
 
     # Encoder output (fixed for the entire sequence generation)
-    encoder_output = model.transformer.encoder(batch['encoder_inputs'], num_heads=2)
+    embd_output = model.embd_projection(batch['encoder_inputs'])
+    encoder_output = model.transformer.encoder(embd_output, num_heads=2)
 
     for t in range(max_seq_len):
         # Decoder processes the current sequence
-        decoder_output = model.transformer.decoder(y, encoder_output, num_heads=2)
-
+        embd_target_output = model.embd_projection(y)
+        decoder_output = model.transformer.decoder(embd_target_output, encoder_output, num_heads=2)
+        output = model.output_projection(decoder_output) 
         # Predict the next token (argmax over vocabulary dimension)
-        next_token = decoder_output[:, -1, :].argmax(axis=-1)
+        next_token = output[:, -1, :].argmax(axis=-1)
 
         # Store the predicted token
         preds = preds.at[:, t].set(next_token)
 
         # Update decoder input for the next time step
-        next_token_embedding = jnp.eye(embed_dim)[next_token]  # One-hot embedding
+        next_token_embedding = jnp.eye(input_dim)[next_token]  # One-hot embedding
         y = jnp.concatenate([y, next_token_embedding[:, None, :]], axis=1)
 
     return preds

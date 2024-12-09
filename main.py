@@ -15,7 +15,10 @@ vocab_size = 19
 seq_length = 10
 target_seq_length = 10
 batch_size = 32
+num_heads = 4
 mask = np.tril(np.ones((target_seq_length, target_seq_length)), k=0)
+metrics_history = {'train_loss': []}
+num_epochs = 500
 
 # Dataset
 dataset = CopyTaskDataset(num_samples=1000, seq_length=seq_length, vocab_size=vocab_size)
@@ -23,13 +26,11 @@ train_set, val_set, test_set = torch.utils.data.random_split(dataset, [0.7, 0.1,
 train_ds = DataLoader(train_set, batch_size=64, shuffle=True, drop_last=True, collate_fn=lambda batch: custom_collate_fn(batch, vocab_size))
 
 # Model and optimizer
-model = Seq2SeqTaskModel(20, 36, 2, 0.1, rngs=nnx.Rngs(0))
-optimizer = nnx.Optimizer(model, optax.adam(0.01))
+model = Seq2SeqTaskModel(20, 100, 36, 2, 0.1, rngs=nnx.Rngs(0))
+optimizer = nnx.Optimizer(model, optax.adam(0.001))
 metrics = nnx.MultiMetric(loss=nnx.metrics.Average('loss'))
 
 # Training loop
-metrics_history = {'train_loss': []}
-num_epochs = 100
 for epoch in range(num_epochs):
     for batch in train_ds:
         loss, logits = train_step(model, optimizer, metrics, batch, mask)
@@ -42,11 +43,12 @@ for epoch in range(num_epochs):
 test_ds = DataLoader(test_set, batch_size=64, shuffle=True, drop_last=True, collate_fn=lambda batch: custom_collate_fn(batch, vocab_size))
 all_preds = []
 all_labels = []
-for batch in test_ds:
+for batch in train_ds:
     all_labels.append(np.argmax(batch['targets'], axis=-1))
-    preds = pred_step(model, batch)
+    preds = pred_step(model, batch, 100)
     print("preds:")
     print(preds)
     print("labels:")
     print(np.argmax(batch['targets'], axis=-1))
     all_preds.append(preds)
+    break
