@@ -16,6 +16,7 @@ class Seq2SeqTaskModel(nnx.Module):
         feedforward_dim (int): Dimension of the hidden feedforward layer in the transformer.
         num_blocks (int): Number of transformer blocks (layers).
         dropout_prob (float): Dropout probability for regularization.
+        num_heads (int): Number of attention heads in the transformer.
         rngs (nnx.Rngs): Random number generators for model initialization.
 
     Attributes:
@@ -27,6 +28,7 @@ class Seq2SeqTaskModel(nnx.Module):
                  feedforward_dim: int, 
                  num_blocks: int, 
                  dropout_prob: float, 
+                 num_heads: int,
                  *, rngs: nnx.Rngs) -> None:
         """
         Initializes the Seq2SeqTaskModel.
@@ -36,16 +38,16 @@ class Seq2SeqTaskModel(nnx.Module):
             feedforward_dim (int): Hidden dimension of the feedforward network.
             num_blocks (int): Number of encoder-decoder layers.
             dropout_prob (float): Dropout probability for Transformer layers.
+            num_heads (int): Number of attention heads.
             rngs (nnx.Rngs): Random number generators for initialization.
         """
         self.embd_projection = nnx.Linear(input_dim, embed_dim, rngs=rngs)
-        self.transformer = Transformer(embed_dim, feedforward_dim, num_blocks, dropout_prob, rngs=rngs)
+        self.transformer = Transformer(embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=rngs)
         self.output_projection = nnx.Linear(embed_dim, input_dim, rngs=rngs)
 
     def __call__(self, 
                  x: jnp.ndarray, 
                  y: jnp.ndarray, 
-                 num_heads: int, 
                  mask: Optional[jnp.ndarray] = None
                  ) -> jnp.ndarray:
         """
@@ -56,7 +58,6 @@ class Seq2SeqTaskModel(nnx.Module):
                 shape `(batch_size, src_seq_length, input_dim)`.
             y (jnp.ndarray): Input tensor for the decoder, 
                 shape `(batch_size, tgt_seq_length, input_dim)`.
-            num_heads (int): Number of attention heads for the Transformer.
             mask (Optional[jnp.ndarray]): Optional mask tensor, 
                 shape `(batch_size, tgt_seq_length, src_seq_length)` 
                 or `(batch_size, tgt_seq_length, tgt_seq_length)`.
@@ -66,6 +67,6 @@ class Seq2SeqTaskModel(nnx.Module):
         """
         x = self.embd_projection(x)
         y = self.embd_projection(y)
-        out = self.transformer(x, y, num_heads, mask)
+        out = self.transformer(x, y, mask)
         out = self.output_projection(out)
         return out

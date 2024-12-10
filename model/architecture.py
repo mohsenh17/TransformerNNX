@@ -53,7 +53,7 @@ class MultiHeadAttention(nnx.Module):
         Computes the multi-head attention output for the input tensor `x` with the given number of heads.
     """
 
-    def __init__(self, embed_dim: int, *, rngs: nnx.Rngs) -> None:
+    def __init__(self, embed_dim: int, num_heads:int, *, rngs: nnx.Rngs) -> None:
         """
         Initializes the MultiHeadAttention module.
 
@@ -61,15 +61,17 @@ class MultiHeadAttention(nnx.Module):
         ----------
         embed_dim : int
             The dimension of the input embeddings.
+        num_heads : int
+            The number of attention heads.
         rngs : nnx.Rngs
             Random number generators for initializing weights of the projection layers.
         """
+        self.num_heads = num_heads
         self.qkv_projection = nnx.Linear(embed_dim, 3 * embed_dim, rngs=rngs)
         self.out_projection = nnx.Linear(embed_dim, embed_dim, rngs=rngs)
 
     def __call__(self, 
                  x: jnp.ndarray, 
-                 num_heads: int, 
                  mask: Optional[jnp.ndarray] = None
                  ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """
@@ -79,8 +81,6 @@ class MultiHeadAttention(nnx.Module):
         ----------
         x : jnp.ndarray
             Input tensor of shape `(batch_size, seq_len, embed_dim)`.
-        num_heads : int
-            The number of attention heads to use.
         mask : Optional[jnp.ndarray], default=None
             Optional mask tensor of shape `(batch_size, seq_len, seq_len)` 
             or `(batch_size, num_heads, seq_len, seq_len)` to apply attention masking.
@@ -97,7 +97,7 @@ class MultiHeadAttention(nnx.Module):
         
         # Compute query, key, and value projections
         qkv = self.qkv_projection(x)  # Shape: (batch_size, seq_len, 3 * embed_dim)
-        qkv = qkv.reshape(batch_size, seq_len, num_heads, -1)  # Split heads
+        qkv = qkv.reshape(batch_size, seq_len, self.num_heads, -1)  # Split heads
         qkv = qkv.transpose(0, 2, 1, 3)  # Shape: (batch_size, num_heads, seq_len, d_k)
         q, k, v = jnp.array_split(qkv, 3, axis=-1)  # Split into query, key, value
         
@@ -126,6 +126,7 @@ class EncoderBlock(nnx.Module):
         input_dim (int): Dimensionality of the input embeddings.
         feedforward_dim (int): Dimensionality of the intermediate feedforward layer.
         dropout_prob (float): Probability of dropout.
+        num_heads (int): Number of attention heads.
         rngs (nnx.Rngs): Random number generators for reproducibility.
     """
 
@@ -133,8 +134,9 @@ class EncoderBlock(nnx.Module):
                  input_dim: int, 
                  feedforward_dim: int, 
                  dropout_prob: float, 
+                 num_heads: int,
                  *, rngs: nnx.Rngs):
-        self.mha = MultiHeadAttention(embed_dim=input_dim, rngs=rngs)
+        self.mha = MultiHeadAttention(embed_dim=input_dim, num_heads=num_heads, rngs=rngs)
         self.linear = [
             nnx.Linear(input_dim, feedforward_dim, rngs=rngs),
             nnx.Dropout(dropout_prob, rngs=rngs),
@@ -146,7 +148,6 @@ class EncoderBlock(nnx.Module):
 
     def __call__(self, 
                  x: jnp.ndarray, 
-                 num_heads: int = 8, 
                  mask: Optional[jnp.ndarray] = None
                  ) -> jnp.ndarray:
         """
@@ -154,7 +155,6 @@ class EncoderBlock(nnx.Module):
 
         Args:
             x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
-            num_heads (int): Number of attention heads in the multi-head attention mechanism. Default is 8.
             mask (Optional[jnp.ndarray]): Optional attention mask of shape 
                                           (seq_len, seq_len), 
                                           (batch_size, seq_len, seq_len), 
@@ -164,7 +164,7 @@ class EncoderBlock(nnx.Module):
             jnp.ndarray: Output tensor of shape (batch_size, seq_len, input_dim).
         """
         # Multi-Head Attention with residual connection and layer norm
-        mha_out, _ = self.mha(x, num_heads=num_heads, mask=mask)
+        mha_out, _ = self.mha(x, mask=mask)
         x = x + self.dropout(mha_out)
         x = self.norm1(x)
         
@@ -191,6 +191,7 @@ class TransformerEncoder(nnx.Module):
         feedforward_dim (int): Dimensionality of the intermediate feedforward layers in each encoder block.
         num_blocks (int): Number of encoder blocks to stack.
         dropout_prob (float): Probability of dropout.
+        num_heads (int): Number of attention heads in each encoder block.
         rngs (nnx.Rngs): Random number generators for reproducibility.
     """
 
@@ -199,15 +200,15 @@ class TransformerEncoder(nnx.Module):
                  feedforward_dim: int, 
                  num_blocks: int, 
                  dropout_prob: float, 
+                 num_heads: int,
                  *, rngs: nnx.Rngs):    
         self.blocks = [
-            EncoderBlock(input_dim, feedforward_dim, dropout_prob, rngs=rngs) 
+            EncoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, rngs=rngs) 
             for _ in range(num_blocks)
         ]
 
     def __call__(self, 
                  x: jnp.ndarray, 
-                 num_heads: int = 8, 
                  mask: Optional[jnp.ndarray] = None
                  ) -> jnp.ndarray:
         """
@@ -215,7 +216,6 @@ class TransformerEncoder(nnx.Module):
 
         Args:
             x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
-            num_heads (int): Number of attention heads for each block's multi-head attention. Default is 8.
             mask (Optional[jnp.ndarray]): Optional attention mask of shape 
                                           (seq_len, seq_len), 
                                           (batch_size, seq_len, seq_len), 
@@ -225,12 +225,11 @@ class TransformerEncoder(nnx.Module):
             jnp.ndarray: Output tensor of shape (batch_size, seq_len, input_dim).
         """
         for block in self.blocks:
-            x = block(x, num_heads=num_heads, mask=mask)
+            x = block(x, mask=mask)
         return x
 
     def get_attention_weights(self, 
                               x: jnp.ndarray, 
-                              num_heads: int = 8, 
                               mask: Optional[jnp.ndarray] = None
                               ) -> List[jnp.ndarray]:
         """
@@ -238,7 +237,6 @@ class TransformerEncoder(nnx.Module):
 
         Args:
             x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
-            num_heads (int): Number of attention heads for each block's multi-head attention. Default is 8.
             mask (Optional[jnp.ndarray]): Optional attention mask of shape 
                                           (seq_len, seq_len), 
                                           (batch_size, seq_len, seq_len), 
@@ -250,7 +248,7 @@ class TransformerEncoder(nnx.Module):
         """
         attention_weights = []
         for block in self.blocks:
-            _, attention_weight = block.mha(x, num_heads=num_heads, mask=mask)
+            _, attention_weight = block.mha(x, mask=mask)
             attention_weights.append(attention_weight)
         return attention_weights
 
@@ -328,6 +326,7 @@ class CrossMultiHeadAttention(nnx.Module):
 
     Args:
         embed_dim (int): Dimensionality of the input embeddings.
+        num_heads (int): Number of attention heads.
         rngs (nnx.Rngs): Random number generators for reproducibility.
     
     Methods:
@@ -336,6 +335,7 @@ class CrossMultiHeadAttention(nnx.Module):
     """
     def __init__(self, 
                  embed_dim: int, 
+                 num_heads: int,
                  *, rngs: nnx.Rngs) -> None:
         """
         Initializes the CrossMultiHeadAttention module.
@@ -344,6 +344,7 @@ class CrossMultiHeadAttention(nnx.Module):
             embed_dim (int): The dimensionality of input embeddings.
             rngs (nnx.Rngs): Random number generators for reproducibility.
         """
+        self.num_heads = num_heads
         self.kv_projection = nnx.Linear(embed_dim, 2 * embed_dim, rngs=rngs)
         self.q_projection = nnx.Linear(embed_dim, embed_dim, rngs=rngs)
         self.out_projection = nnx.Linear(embed_dim, embed_dim, rngs=rngs)
@@ -351,7 +352,6 @@ class CrossMultiHeadAttention(nnx.Module):
     def __call__(self, 
                  x: jnp.ndarray, 
                  kv: jnp.ndarray, 
-                 num_heads: int, 
                  mask: Optional[jnp.ndarray] = None
                  ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """
@@ -360,7 +360,6 @@ class CrossMultiHeadAttention(nnx.Module):
         Args:
             x (jnp.ndarray): Query tensor of shape (batch_size, seq_len, embed_dim).
             kv (jnp.ndarray): Key-value tensor of shape (batch_size, seq_len, embed_dim).
-            num_heads (Optional[int]): Number of attention heads. Defaults to 1.
             mask (Optional[jnp.ndarray]): Optional attention mask of shape (batch_size, seq_len, seq_len).
 
         Returns:
@@ -369,7 +368,7 @@ class CrossMultiHeadAttention(nnx.Module):
                 - Attention weights tensor of shape (batch_size, num_heads, seq_len, seq_len).
         """
         batch_size, seq_len, embed_dim = x.shape
-        assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
+        assert embed_dim % self.num_heads == 0, "embed_dim must be divisible by num_heads"
         if mask is not None:
             mask = utils.expand_mask(mask)  # Ensure mask is in the correct 4D format
         
@@ -378,12 +377,12 @@ class CrossMultiHeadAttention(nnx.Module):
         
         # Project keys and values
         kv = self.kv_projection(kv)
-        kv = kv.reshape(batch_size, -1, num_heads, 2*embed_dim // num_heads)
+        kv = kv.reshape(batch_size, -1, self.num_heads, 2*embed_dim // self.num_heads)
         kv = kv.transpose(0, 2, 1, 3)  # Shape: (batch_size, num_heads, seq_len, d_k)
         k, v = jnp.array_split(kv, 2, axis=-1)  # Split into key and value
         
         # Split and reshape queries
-        q = q.reshape(batch_size, seq_len, num_heads, -1)
+        q = q.reshape(batch_size, seq_len, self.num_heads, -1)
         q = q.transpose(0, 2, 1, 3)  # Shape: (batch_size, num_heads, seq_len, d_k)
 
         # Compute attention
@@ -412,22 +411,24 @@ class DecoderBlock(nnx.Module):
         input_dim (int): The dimensionality of input embeddings.
         feedforward_dim (int): The dimensionality of the feedforward network.
         dropout_prob (float): Dropout probability for regularization.
+        num_heads (int): Number of attention heads.
         rngs (nnx.Rngs): Random number generators for reproducibility.
 
     Methods:
-        __call__(x, encoder_kv, num_heads, mask) -> jnp.ndarray:
+        __call__(x, encoder_kv, mask) -> jnp.ndarray:
             Performs forward computation of the decoder block.
     """
     def __init__(self, 
                  input_dim: int, 
                  feedforward_dim: int,
                  dropout_prob: float,
+                 num_heads: int,
                  *, rngs: nnx.Rngs) -> None:
         """
         Initializes the DecoderBlock module.
         """
-        self.mha = MultiHeadAttention(embed_dim=input_dim, rngs=rngs)  # Self-attention
-        self.cmha = CrossMultiHeadAttention(embed_dim=input_dim, rngs=rngs)  # Cross-attention
+        self.mha = MultiHeadAttention(input_dim,num_heads, rngs=rngs)  # Self-attention
+        self.cmha = CrossMultiHeadAttention(input_dim, num_heads, rngs=rngs)  # Cross-attention
         self.linear = [
             nnx.Linear(input_dim, feedforward_dim, rngs=rngs),
             nnx.Dropout(dropout_prob, rngs=rngs),
@@ -441,7 +442,6 @@ class DecoderBlock(nnx.Module):
     def __call__(self, 
                  x: jnp.ndarray, 
                  encoder_kv: jnp.ndarray, 
-                 num_heads: int, 
                  mask: Optional[jnp.ndarray] = None
                  ) -> jnp.ndarray:
         """
@@ -450,20 +450,19 @@ class DecoderBlock(nnx.Module):
         Args:
             x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, input_dim).
             encoder_kv (jnp.ndarray): Encoder output used as key-value pairs for cross-attention.
-            num_heads (int): Number of attention heads.
             mask (Optional[jnp.ndarray]): Optional mask for attention.
 
         Returns:
             jnp.ndarray: Output tensor of shape (batch_size, seq_len, input_dim).
         """
         # Self-attention
-        mha_out, _ = self.mha(x, num_heads=num_heads, mask=mask)
+        mha_out, _ = self.mha(x, mask=mask)
         x = x + self.dropout(mha_out)
         x = self.norm1(x)
         
         # Cross-attention
-        #cmha_out, _ = self.cmha(x, encoder_kv, num_heads=num_heads, mask=mask)
-        cmha_out, _ = self.cmha(x, encoder_kv, num_heads=num_heads)
+        #cmha_out, _ = self.cmha(x, encoder_kv, mask=mask)
+        cmha_out, _ = self.cmha(x, encoder_kv)
         x = x + self.dropout(cmha_out)
         x = self.norm2(x)
         
@@ -487,16 +486,17 @@ class TransformerDecoder(nnx.Module):
         feedforward_dim (int): Dimensionality of the feedforward network.
         num_blocks (int): Number of decoder blocks.
         dropout_prob (float): Dropout probability for regularization.
+        num_heads (int): Number of attention heads.
         rngs (nnx.Rngs): Random number generators for reproducibility.
 
     Methods:
-        __call__(x, encoder_kv, num_heads, mask) -> jnp.ndarray:
+        __call__(x, encoder_kv, mask) -> jnp.ndarray:
             Performs the forward computation through the decoder.
 
-        get_mha_attention_weights(x, num_heads, mask) -> List[jnp.ndarray]:
+        get_mha_attention_weights(x, mask) -> List[jnp.ndarray]:
             Returns a list of self-attention weight matrices from all decoder blocks.
 
-        get_cmha_attention_weights(x, encoder_kv, num_heads, mask) -> List[jnp.ndarray]:
+        get_cmha_attention_weights(x, encoder_kv, mask) -> List[jnp.ndarray]:
             Returns a list of cross-attention weight matrices from all decoder blocks.
     """
     def __init__(self, 
@@ -504,20 +504,20 @@ class TransformerDecoder(nnx.Module):
                  feedforward_dim: int,
                  num_blocks: int,
                  dropout_prob: float,
+                 num_heads: int,
                  *, rngs: nnx.Rngs) -> None:
         """
         Initializes the TransformerDecoder module.
         """
         self.blocks = [
-            DecoderBlock(input_dim, feedforward_dim, dropout_prob, rngs=rngs)
+            DecoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, rngs=rngs)
             for _ in range(num_blocks)
         ]
         self.out_projection = nnx.Linear(input_dim, input_dim, rngs=rngs)
         
     def __call__(self, 
                  x: jnp.ndarray, 
-                 encoder_kv: jnp.ndarray, 
-                 num_heads: int, 
+                 encoder_kv: jnp.ndarray,
                  mask: Optional[jnp.ndarray] = None
                  ) -> jnp.ndarray:
         """
@@ -526,21 +526,19 @@ class TransformerDecoder(nnx.Module):
         Args:
             x (jnp.ndarray): Decoder input tensor of shape (batch_size, seq_len, input_dim).
             encoder_kv (jnp.ndarray): Encoder output used as key-value pairs for cross-attention.
-            num_heads (int): Number of attention heads.
             mask (Optional[jnp.ndarray]): Optional mask for attention.
 
         Returns:
             jnp.ndarray: Output tensor after applying the decoder.
         """
         for block in self.blocks:
-            x = block(x, encoder_kv, num_heads, mask)
+            x = block(x, encoder_kv, mask)
         #x = self.out_projection(x)
         #x = nnx.softmax(x, axis=-1)  # Optional final softmax
         return x
     
     def get_mha_attention_weights(self, 
                                   x: jnp.ndarray, 
-                                  num_heads: int = 8, 
                                   mask: Optional[jnp.ndarray] = None
                                   ) -> List[jnp.ndarray]:
         """
@@ -548,7 +546,6 @@ class TransformerDecoder(nnx.Module):
 
         Args:
             x (jnp.ndarray): Decoder input tensor.
-            num_heads (int): Number of attention heads.
             mask (Optional[jnp.ndarray]): Optional attention mask.
 
         Returns:
@@ -556,14 +553,13 @@ class TransformerDecoder(nnx.Module):
         """
         attention_weights = []
         for block in self.blocks:
-            _, attention_weight = block.mha(x, num_heads=num_heads, mask=mask)
+            _, attention_weight = block.mha(x, mask=mask)
             attention_weights.append(attention_weight)
         return attention_weights
     
     def get_cmha_attention_weights(self, 
                                    x: jnp.ndarray, 
                                    encoder_kv: jnp.ndarray,
-                                   num_heads: int = 8, 
                                    mask: Optional[jnp.ndarray] = None
                                    ) -> List[jnp.ndarray]:
         """
@@ -572,7 +568,6 @@ class TransformerDecoder(nnx.Module):
         Args:
             x (jnp.ndarray): Decoder input tensor.
             encoder_kv (jnp.ndarray): Encoder output used for cross-attention.
-            num_heads (int): Number of attention heads.
             mask (Optional[jnp.ndarray]): Optional attention mask.
 
         Returns:
@@ -580,7 +575,7 @@ class TransformerDecoder(nnx.Module):
         """
         attention_weights = []
         for block in self.blocks:
-            _, attention_weight = block.cmha(x, encoder_kv, num_heads=num_heads, mask=mask)
+            _, attention_weight = block.cmha(x, encoder_kv, mask=mask)
             attention_weights.append(attention_weight)
         return attention_weights
 
@@ -594,10 +589,11 @@ class Transformer(nnx.Module):
         feedforward_dim (int): Dimensionality of the feedforward network.
         num_blocks (int): Number of encoder and decoder blocks.
         dropout_prob (float): Dropout probability for regularization.
+        num_heads (int): Number of attention heads.
         rngs (nnx.Rngs): Random number generators for reproducibility.
 
     Methods:
-        __call__(x, y, num_heads, mask=None) -> jnp.ndarray:
+        __call__(x, y, mask=None) -> jnp.ndarray:
             Performs the forward computation through the Transformer.
     """
     def __init__(self, 
@@ -605,6 +601,7 @@ class Transformer(nnx.Module):
                  feedforward_dim: int, 
                  num_blocks: int, 
                  dropout_prob: float, 
+                 num_heads: int,
                  *, rngs: nnx.Rngs) -> None:
         """
         Initializes the Transformer module.
@@ -614,6 +611,7 @@ class Transformer(nnx.Module):
             feedforward_dim=feedforward_dim, 
             num_blocks=num_blocks, 
             dropout_prob=dropout_prob, 
+            num_heads=num_heads,
             rngs=rngs
         )
         self.decoder = TransformerDecoder(
@@ -621,6 +619,7 @@ class Transformer(nnx.Module):
             feedforward_dim=feedforward_dim, 
             num_blocks=num_blocks, 
             dropout_prob=dropout_prob, 
+            num_heads=num_heads,
             rngs=rngs
         )
         self.out_projection = nnx.Linear(input_dim, input_dim, rngs=rngs)
@@ -628,7 +627,6 @@ class Transformer(nnx.Module):
     def __call__(self, 
                  x: jnp.ndarray, 
                  y: jnp.ndarray, 
-                 num_heads: int, 
                  mask: Optional[jnp.ndarray] = None
                  ) -> jnp.ndarray:
         """
@@ -637,17 +635,16 @@ class Transformer(nnx.Module):
         Args:
             x (jnp.ndarray): Input tensor (source sequence) of shape (batch_size, src_seq_len, input_dim).
             y (jnp.ndarray): Target tensor (shifted target sequence) of shape (batch_size, tgt_seq_len, input_dim).
-            num_heads (int): Number of attention heads.
             mask (Optional[jnp.ndarray]): Optional mask for attention.
 
         Returns:
             jnp.ndarray: Output tensor after applying the Transformer.
         """
         # Pass through encoder
-        encoder_kv = self.encoder(x, num_heads)
+        encoder_kv = self.encoder(x)
         
         # Pass through decoder with encoder outputs
-        decoder_output = self.decoder(y, encoder_kv, num_heads, mask)
+        decoder_output = self.decoder(y, encoder_kv, mask)
         
         # Final linear projection
         output = self.out_projection(decoder_output)

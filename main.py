@@ -27,7 +27,7 @@ train_set, val_set, test_set = torch.utils.data.random_split(dataset, [0.7, 0.1,
 train_ds = DataLoader(train_set, batch_size=64, shuffle=True, drop_last=True, collate_fn=lambda batch: custom_collate_fn(batch, vocab_size))
 
 # Model and optimizer
-model = Seq2SeqTaskModel(20, 100, 36, 2, 0.1, rngs=nnx.Rngs(0))
+model = Seq2SeqTaskModel(20, 100, 36, 2, 0.1, num_heads=num_heads, rngs=nnx.Rngs(0))
 optimizer = nnx.Optimizer(model, optax.adam(0.001))
 metrics = nnx.MultiMetric(loss=nnx.metrics.Average('loss'))
 
@@ -48,7 +48,7 @@ all_preds = []
 all_labels = []
 for batch in test_ds:
     all_labels.append(np.argmax(batch['targets'], axis=-1))
-    preds = pred_step(model, batch)
+    preds = pred_step(model, batch, target_seq_length)
     print("preds:", preds[0])
     print("labels:", np.argmax(batch['targets'], axis=-1)[0])
     all_preds.append(preds)

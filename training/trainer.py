@@ -9,7 +9,6 @@ def loss_fn(model: nnx.Module,
             encoder_inputs: jnp.ndarray, 
             decoder_inputs: jnp.ndarray, 
             targets: jnp.ndarray, 
-            num_heads: int, 
             mask: Optional[jnp.ndarray]) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
     Computes the loss and logits for a given model and inputs.
@@ -19,7 +18,6 @@ def loss_fn(model: nnx.Module,
         encoder_inputs (jnp.ndarray): One-hot encoded encoder inputs of shape (batch_size, seq_length, vocab_size).
         decoder_inputs (jnp.ndarray): One-hot encoded decoder inputs of shape (batch_size, seq_length, vocab_size).
         targets (jnp.ndarray): One-hot encoded target labels of shape (batch_size, seq_length, vocab_size).
-        num_heads (int): Number of attention heads in the transformer.
         mask (Optional[jnp.ndarray]): Optional attention mask of shape (batch_size, seq_length, seq_length).
 
     Returns:
@@ -27,7 +25,7 @@ def loss_fn(model: nnx.Module,
             - loss: Scalar loss value.
             - logits: Model predictions of shape (batch_size, seq_length, vocab_size).
     """
-    logits = model(encoder_inputs, decoder_inputs, num_heads, mask)
+    logits = model(encoder_inputs, decoder_inputs, mask)
     loss = optax.softmax_cross_entropy(logits=logits, labels=targets).mean()
     return loss, logits
 
@@ -61,7 +59,6 @@ def train_step(model: nnx.Module,
         batch['encoder_inputs'], 
         batch['decoder_inputs'], 
         batch['targets'], 
-        num_heads=2, 
         mask=mask
     )
     metrics.update(loss=loss, logits=logits, labels=batch['targets'])
@@ -71,26 +68,28 @@ def train_step(model: nnx.Module,
 @nnx.jit
 def eval_step(model: nnx.Module, 
               metrics: Dict, 
-              batch: Dict[str, jnp.ndarray]) -> jnp.ndarray:
+              batch: Dict[str, jnp.ndarray],
+              num_heads: int) -> jnp.ndarray:
     """
     not Implemented
     """
     raise NotImplementedError
     loss, logits = loss_fn(
         model, 
-        encoder_inputs=batch['inputs'], 
-        decoder_inputs=batch['targets'], 
-        targets=batch['targets'], 
-        num_heads=2, 
-        mask=None
+        batch['encoder_inputs'], 
+        batch['decoder_inputs'], 
+        batch['targets'], 
+        num_heads, 
+        mask=mask
     )
     metrics.update(loss=loss, logits=logits, labels=batch['inputs'])
     return loss
 
-@nnx.jit
+@nnx.jit(static_argnums=(2,))
 def pred_step(model: nnx.Module, 
               batch: Dict[str, jnp.ndarray], 
-              max_seq_len: int = 10) -> jnp.ndarray:
+              max_seq_len: int,
+              ) -> jnp.ndarray:
     """
     Performs autoregressive prediction using the given transformer model.
 
@@ -111,12 +110,12 @@ def pred_step(model: nnx.Module,
 
     # Encoder output (fixed for the entire sequence generation)
     embd_output = model.embd_projection(batch['encoder_inputs'])
-    encoder_output = model.transformer.encoder(embd_output, num_heads=2)
+    encoder_output = model.transformer.encoder(embd_output)
 
     for t in range(max_seq_len):
         # Decoder processes the current sequence
         embd_target_output = model.embd_projection(y)
-        decoder_output = model.transformer.decoder(embd_target_output, encoder_output, num_heads=2)
+        decoder_output = model.transformer.decoder(embd_target_output, encoder_output)
         output = model.output_projection(decoder_output) 
         # Predict the next token (argmax over vocabulary dimension)
         next_token = output[:, -1, :].argmax(axis=-1)
