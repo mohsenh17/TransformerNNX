@@ -66,7 +66,7 @@ def train_step(model: nnx.Module,
     )
     metrics.update(loss=loss, logits=logits, labels=batch['targets'])
     optimizer.update(grads)
-    return loss, nnx.sigmoid(logits)
+    return loss, nnx.softmax(logits)
 
 @nnx.jit
 def eval_step(model: nnx.Module, 
@@ -90,7 +90,6 @@ def eval_step(model: nnx.Module,
 @nnx.jit
 def pred_step(model: nnx.Module, 
               batch: Dict[str, jnp.ndarray], 
-              embed_dim: int = 100,
               max_seq_len: int = 10) -> jnp.ndarray:
     """
     Performs autoregressive prediction using the given transformer model.
