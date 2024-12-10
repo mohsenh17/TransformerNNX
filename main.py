@@ -18,7 +18,7 @@ batch_size = 32
 num_heads = 4
 mask = np.tril(np.ones((target_seq_length, target_seq_length)), k=0)
 metrics_history = {'train_loss': []}
-num_epochs = 500
+num_epochs = 350
 
 # Dataset
 dataset = CopyTaskDataset(num_samples=1000, seq_length=seq_length, vocab_size=vocab_size)
@@ -38,17 +38,17 @@ for epoch in range(num_epochs):
         metrics_history[f'train_{metric}'].append(value)
     metrics.reset()
     print(f"[train] epoch: {epoch + 1}/{num_epochs}, loss: {metrics_history['train_loss'][-1]:.4f}")
-
+    
+    #print("logits:", logits.argmax(axis=-1)[0])
+    #print("labels:", np.argmax(batch['targets'], axis=-1)[0])
 # Testing loop
 test_ds = DataLoader(test_set, batch_size=64, shuffle=True, drop_last=True, collate_fn=lambda batch: custom_collate_fn(batch, vocab_size))
 all_preds = []
 all_labels = []
-for batch in train_ds:
+for batch in test_ds:
     all_labels.append(np.argmax(batch['targets'], axis=-1))
-    preds = pred_step(model, batch, 100)
-    print("preds:")
-    print(preds)
-    print("labels:")
-    print(np.argmax(batch['targets'], axis=-1))
+    preds = pred_step(model, batch)
+    print("preds:", preds[0])
+    print("labels:", np.argmax(batch['targets'], axis=-1)[0])
     all_preds.append(preds)
     break
