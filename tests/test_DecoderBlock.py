@@ -21,11 +21,12 @@ def test_decoder_block():
         input_dim=input_dim,
         feedforward_dim=feedforward_dim,
         dropout_prob=dropout_prob,
+        num_heads=num_heads,
         rngs=nnx.Rngs(0),
     )
 
     # Forward pass
-    output = decoder_block(x, encoder_kv, num_heads=num_heads)
+    output = decoder_block(x, encoder_kv)
 
     # Check output shape
     assert output.shape == (batch_size, seq_len, input_dim), "Output shape mismatch"

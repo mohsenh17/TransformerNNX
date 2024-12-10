@@ -15,10 +15,10 @@ def test_cross_multi_head_attention():
     kv = jnp.ones((batch_size, seq_len, embed_dim))
     
     # Initialize the module
-    attention_module = CrossMultiHeadAttention(embed_dim=embed_dim, rngs=nnx.Rngs(0))
+    attention_module = CrossMultiHeadAttention(embed_dim, num_heads, rngs=nnx.Rngs(0))
     
     # Forward pass
-    output, attention_weights = attention_module(x, kv, num_heads=num_heads)
+    output, attention_weights = attention_module(x, kv,)
     
     # Check output shape
     assert output.shape == (batch_size, seq_len, embed_dim), "Output shape mismatch"

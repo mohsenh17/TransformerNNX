@@ -10,12 +10,14 @@ def transformer():
     feedforward_dim = 64
     num_blocks = 2
     dropout_prob = 0.1
-    rng = nnx.Rngs(seed=42)  # Fixed random seed for reproducibility
+    num_heads = 4
+    rng = nnx.Rngs(0)  # Fixed random seed for reproducibility
     return Transformer(
         input_dim=input_dim,
         feedforward_dim=feedforward_dim,
         num_blocks=num_blocks,
         dropout_prob=dropout_prob,
+        num_heads=num_heads,
         rngs=rng,
     )
 def test_transformer_initialization(transformer):
@@ -35,10 +37,9 @@ def test_transformer_forward_pass(transformer):
     # Create dummy inputs
     x = jnp.ones((batch_size, src_seq_len, input_dim))  # Source sequence
     y = jnp.ones((batch_size, tgt_seq_len, input_dim))  # Target sequence
-    num_heads = 4
-
+    
     # Forward pass
-    output = transformer(x, y, num_heads)
+    output = transformer(x, y)
 
     # Check output shape
     assert output.shape == (batch_size, tgt_seq_len, input_dim), (
@@ -57,10 +58,9 @@ def test_transformer_with_mask(transformer):
     x = jnp.ones((batch_size, src_seq_len, input_dim))  # Source sequence
     y = jnp.ones((batch_size, tgt_seq_len, input_dim))  # Target sequence
     mask = jnp.ones((src_seq_len, tgt_seq_len))  # Example mask
-    num_heads = 4
-
+    
     # Forward pass
-    output = transformer(x, y, num_heads, mask=mask)
+    output = transformer(x, y, mask=mask)
 
     # Check output shape
     assert output.shape == (batch_size, tgt_seq_len, input_dim), (

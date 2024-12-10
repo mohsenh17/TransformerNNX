@@ -8,7 +8,8 @@ def test_multi_head_attention_initialization():
     Test that the MultiHeadAttention module initializes without errors.
     """
     embed_dim = 64
-    mha = MultiHeadAttention(embed_dim, rngs=nnx.Rngs(0))
+    num_heads = 4
+    mha = MultiHeadAttention(embed_dim, num_heads, rngs=nnx.Rngs(0))
     assert mha.qkv_projection is not None
     assert mha.out_projection is not None
 
@@ -20,8 +21,8 @@ def test_multi_head_attention_output_shape():
     batch_size, seq_len, embed_dim = 2, 10, 64
     num_heads = 4
     x = jnp.ones((batch_size, seq_len, embed_dim))
-    mha = MultiHeadAttention(embed_dim, rngs=nnx.Rngs(0))
-    out, attention = mha(x, num_heads)
+    mha = MultiHeadAttention(embed_dim, num_heads, rngs=nnx.Rngs(0))
+    out, attention = mha(x)
 
     # Assert output shapes
     assert out.shape == (batch_size, seq_len, embed_dim), "Output shape is incorrect"
@@ -44,8 +45,8 @@ def test_multi_head_attention_with_mask(mask_shape):
     num_heads = 4
     x = jnp.ones((batch_size, seq_len, embed_dim))
     mask = jnp.ones(mask_shape)
-    mha = MultiHeadAttention(embed_dim, rngs=nnx.Rngs(0))
-    out, attention = mha(x, num_heads, mask)
+    mha = MultiHeadAttention(embed_dim, num_heads, rngs=nnx.Rngs(0))
+    out, attention = mha(x, mask)
 
     # Assert output shapes
     assert out.shape == (batch_size, seq_len, embed_dim), "Output shape is incorrect with mask"
@@ -57,15 +58,15 @@ def test_multi_head_attention_invalid_input():
     Test that MultiHeadAttention raises errors for invalid inputs.
     """
     embed_dim = 64
-    mha = MultiHeadAttention(embed_dim, rngs=nnx.Rngs(0))
+    mha = MultiHeadAttention(embed_dim, num_heads=4, rngs=nnx.Rngs(0))
 
     # Test for invalid input shape
     with pytest.raises(ValueError):
         x = jnp.ones((2, 10))  # Missing embedding dimension
-        mha(x, num_heads=4)
+        mha(x)
 
     # Test for mismatched mask shape
     with pytest.raises(ValueError):
         x = jnp.ones((2, 10, embed_dim))
         mask = jnp.ones((5, 5))  # Mismatched sequence length
-        mha(x, num_heads=4, mask=mask)
+        mha(x, mask=mask)

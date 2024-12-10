@@ -23,19 +23,20 @@ def test_transformer_decoder():
         feedforward_dim=feedforward_dim,
         num_blocks=num_blocks,
         dropout_prob=dropout_prob,
+        num_heads=num_heads,
         rngs=nnx.Rngs(0),
     )
 
     # Forward pass
-    output = decoder(x, encoder_kv, num_heads=num_heads)
+    output = decoder(x, encoder_kv)
     assert output.shape == (batch_size, seq_len, input_dim), "Output shape mismatch"
 
     # Test self-attention weights
-    mha_weights = decoder.get_mha_attention_weights(x, num_heads=num_heads)
+    mha_weights = decoder.get_mha_attention_weights(x)
     assert len(mha_weights) == num_blocks, "Mismatch in number of self-attention weights"
 
     # Test cross-attention weights
-    cmha_weights = decoder.get_cmha_attention_weights(x, encoder_kv, num_heads=num_heads)
+    cmha_weights = decoder.get_cmha_attention_weights(x, encoder_kv)
     assert len(cmha_weights) == num_blocks, "Mismatch in number of cross-attention weights"
 
 # Run with pytest

@@ -10,7 +10,8 @@ def test_encoder_block_initialization():
     input_dim = 64
     feedforward_dim = 128
     dropout_prob = 0.1
-    encoder = EncoderBlock(input_dim, feedforward_dim, dropout_prob, rngs=nnx.Rngs(0))
+    num_heads = 8
+    encoder = EncoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, rngs=nnx.Rngs(0))
     
     assert encoder.mha is not None
     assert len(encoder.linear) == 3
@@ -26,7 +27,8 @@ def test_encoder_block_output_shape():
     batch_size, seq_len, input_dim = 2, 10, 64
     feedforward_dim = 128
     dropout_prob = 0.1
-    encoder = EncoderBlock(input_dim, feedforward_dim, dropout_prob, rngs=nnx.Rngs(0))
+    num_heads = 8
+    encoder = EncoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, rngs=nnx.Rngs(0))
 
     x = jnp.ones((batch_size, seq_len, input_dim))
     out = encoder(x)
@@ -40,7 +42,8 @@ def test_encoder_block_with_mask():
     batch_size, seq_len, input_dim = 2, 10, 64
     feedforward_dim = 128
     dropout_prob = 0.1
-    encoder = EncoderBlock(input_dim, feedforward_dim, dropout_prob, rngs=nnx.Rngs(0))
+    num_heads = 8
+    encoder = EncoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, rngs=nnx.Rngs(0))
 
     x = jnp.ones((batch_size, seq_len, input_dim))
     mask = jnp.ones((seq_len, seq_len))  # Simple 2D mask
@@ -55,7 +58,8 @@ def test_encoder_block_invalid_input():
     input_dim = 64
     feedforward_dim = 128
     dropout_prob = 0.1
-    encoder = EncoderBlock(input_dim, feedforward_dim, dropout_prob, rngs=nnx.Rngs(0))
+    num_heads = 8
+    encoder = EncoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, rngs=nnx.Rngs(0))
 
     # Invalid input shape
     with pytest.raises(ValueError):
