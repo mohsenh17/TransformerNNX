@@ -26,7 +26,7 @@ TransformerNNX/
 │   ├── __init__.py               # Module initialization
 │   └── trainer.py                # Training logic and loops
 ├── checkpoints/
-│   └── 🚧 checkpoint_manager.py     # [TODO] Save and load model checkpoints
+│   └── checkpoint_manager.py     # Save and load model checkpoints
 ├── evaluation/
 │   └── 🚧 evaluator.py              # [TODO] Functions for model evaluation
 ├── tests/
