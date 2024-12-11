@@ -8,7 +8,7 @@ from training.trainer import train_step, pred_step
 from flax import nnx
 import optax
 import numpy as np
-from checkpoints.checkpoint_manager import save_model
+from checkpoints.checkpoint_manager import restore_model
 import jax.numpy as jnp
 import os
 
@@ -27,7 +27,7 @@ mask = np.tril(np.ones((target_seq_length, target_seq_length)), k=0)
 batch_size = 32
 dataset_split = [0.7, 0.1, 0.2]
 metrics_history = {'train_loss': []}
-num_epochs = 1
+num_epochs = 250
 model_args = (input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads)
 ckpt_dir = 'savedModels'
 learning_rate = 0.001
@@ -42,28 +42,14 @@ train_ds = DataLoader(train_set,
                       collate_fn=lambda batch: custom_collate_fn(batch, vocab_size))
 
 # Model and optimizer
-model = Seq2SeqTaskModel(input_dim, embed_dim, 
+model_init = Seq2SeqTaskModel(input_dim, embed_dim, 
                          feedforward_dim, num_blocks, 
                          dropout_prob, num_heads, rngs=nnx.Rngs(0))
-optimizer = nnx.Optimizer(model, optax.adam(0.001))
+optimizer = nnx.Optimizer(model_init, optax.adam(0.001))
 metrics = nnx.MultiMetric(loss=nnx.metrics.Average('loss'))
 
-# nnx.display(model)
 
-# Training loop
-for epoch in range(num_epochs):
-    for batch in train_ds:
-        loss, logits = train_step(model, optimizer, metrics, batch, mask)
-    for metric, value in metrics.compute().items():
-        metrics_history[f'train_{metric}'].append(value)
-    metrics.reset()
-    print(f"[train] epoch: {epoch + 1}/{num_epochs}, loss: {metrics_history['train_loss'][-1]:.4f}")
-    save_model(model, os.path.abspath(ckpt_dir))
-    
-    #print("logits:", logits.argmax(axis=-1)[0])
-    #print("labels:", np.argmax(batch['targets'], axis=-1)[0])
-
-# Testing loop
+model = restore_model(model_init, os.path.abspath(ckpt_dir))
 test_ds = DataLoader(test_set, 
                      batch_size, 
                      shuffle=True, 
@@ -71,6 +57,8 @@ test_ds = DataLoader(test_set,
                      collate_fn=lambda batch: custom_collate_fn(batch, vocab_size))
 all_preds = []
 all_labels = []
+#nnx.display(model)
+#exit()
 for batch in test_ds:
     all_labels.append(np.argmax(batch['targets'], axis=-1))
     preds = pred_step(model, batch, target_seq_length)
