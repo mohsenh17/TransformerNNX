@@ -29,7 +29,7 @@ TransformerNNX/
 ├── checkpoints/
 │   └── checkpoint_manager.py     # Save and load model checkpoints
 ├── evaluation/
-│   └── 🚧 evaluator.py          # [TODO] Functions for model evaluation
+│   └── evaluator.py          # Functions for model evaluation
 ├── tests/
 │   ├── test_CrossMultiHeadAttention.py             
 │   ├── test_DecoderBlock.py             
