@@ -142,7 +142,21 @@ def eval_step(model: nnx.Module,
               batch: Dict[str, jnp.ndarray],
               mask: Optional[jnp.ndarray] = None) -> jnp.ndarray:
     """
-    not Implemented
+    Performs a single evaluation step for a given model and batch of data.
+
+    Args:
+        model (nnx.Module): The model instance, which can include different architectures.
+        metrics (Dict[str, jnp.ndarray]): A dictionary to store metrics such as loss and logits.
+        batch (Dict[str, jnp.ndarray]): Input batch containing:
+            - 'encoder_inputs': Inputs for the encoder.
+            - 'decoder_inputs': Inputs for the decoder.
+            - 'targets': Ground truth labels.
+        mask (Optional[jnp.ndarray]): Optional attention mask for sequences.
+
+    Returns:
+        Tuple[jnp.ndarray, jnp.ndarray]: 
+            - Computed loss for the batch.
+            - Softmax probabilities of the model's predictions.
     """
     if model.model_backbone.__class__.__name__ == 'Transformer':
         preds, output = generate_sequence(model, batch)
