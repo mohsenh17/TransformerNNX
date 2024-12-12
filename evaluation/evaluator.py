@@ -4,7 +4,7 @@ from data.reverse_task_data import ReverseTaskDataset
 from data.utils import custom_collate_fn
 from data.copy_task_data import CopyTaskDataset
 from tasks.transformer_seq2seq_task import Seq2SeqTaskModel
-from training.trainer import train_step, pred_step
+from training.utils import pred_step
 from flax import nnx
 import optax
 import numpy as np
