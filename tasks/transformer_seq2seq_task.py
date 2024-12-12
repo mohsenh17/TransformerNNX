@@ -42,7 +42,7 @@ class Seq2SeqTaskModel(nnx.Module):
             rngs (nnx.Rngs): Random number generators for initialization.
         """
         self.embd_projection = nnx.Linear(input_dim, embed_dim, rngs=rngs)
-        self.transformer = Transformer(embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=rngs)
+        self.model_backbone  = Transformer(embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=rngs)
         self.output_projection = nnx.Linear(embed_dim, input_dim, rngs=rngs)
 
     def __call__(self, 
@@ -67,6 +67,6 @@ class Seq2SeqTaskModel(nnx.Module):
         """
         x = self.embd_projection(x)
         y = self.embd_projection(y)
-        out = self.transformer(x, y, mask)
+        out = self.model_backbone(x, y, mask)
         out = self.output_projection(out)
         return out

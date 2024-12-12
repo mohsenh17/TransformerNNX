@@ -4,7 +4,7 @@ from data.reverse_task_data import ReverseTaskDataset
 from data.utils import custom_collate_fn
 from data.copy_task_data import CopyTaskDataset
 from tasks.transformer_seq2seq_task import Seq2SeqTaskModel
-from training.transformer_trainer import TrainerWithEarlyStopping
+from training.trainer import TrainerWithEarlyStopping
 from flax import nnx
 import optax
 import numpy as np
@@ -27,7 +27,7 @@ mask = np.tril(np.ones((target_seq_length, target_seq_length)), k=0)
 batch_size = 32
 dataset_split = [0.7, 0.1, 0.2]
 metrics_history = {'train_loss': []}
-num_epochs = 100
+num_epochs = 5
 model_args = (input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads)
 ckpt_dir = 'savedModels'
 learning_rate = 0.001
@@ -56,6 +56,7 @@ model = Seq2SeqTaskModel(input_dim, embed_dim,
 optimizer = nnx.Optimizer(model, optax.adam(learning_rate))
 metrics = nnx.MultiMetric(loss=nnx.metrics.Average('loss'))
 
+#print(model.model_backbone.__class__.__name__)
 # nnx.display(model)
 trainer = TrainerWithEarlyStopping(model, mask, optimizer, train_ds, val_ds, 
                                    metrics, num_epochs, tracking_metric, patience, ckpt_dir, mode='min')

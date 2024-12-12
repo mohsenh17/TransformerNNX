@@ -1,7 +1,7 @@
 import os
 import jax
 import numpy as np
-from training.transformer_utils import train_step, eval_step
+from training.utils import train_step, eval_step
 from checkpoints.checkpoint_manager import save_model
 from collections import defaultdict
 class TrainerWithEarlyStopping:
