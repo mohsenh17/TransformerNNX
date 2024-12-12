@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from data.reverse_task_data import ReverseTaskDataset
 from data.utils import custom_collate_fn
 from data.copy_task_data import CopyTaskDataset
-from tasks.transformer_seq2seq_task import Seq2SeqTaskModel
+from tasks.seq2seq_task import Seq2SeqTaskTransformerModel, Seq2SeqTaskEncoderModel
 from training.utils import pred_step
 from flax import nnx
 import optax
@@ -29,7 +29,6 @@ dataset_split = [0.7, 0.1, 0.2]
 metrics_history = {'train_loss': []}
 num_epochs = 250
 model_args = (input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads)
-ckpt_dir = 'savedModels'
 learning_rate = 0.001
 
 # Dataset
@@ -42,9 +41,9 @@ train_ds = DataLoader(train_set,
                       collate_fn=lambda batch: custom_collate_fn(batch, vocab_size))
 
 # Model and optimizer
-model_init = Seq2SeqTaskModel(input_dim, embed_dim, 
-                         feedforward_dim, num_blocks, 
-                         dropout_prob, num_heads, rngs=nnx.Rngs(0))
+#model_init = Seq2SeqTaskTransformerModel(input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=nnx.Rngs(0))
+model_init = Seq2SeqTaskEncoderModel(input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=nnx.Rngs(0))
+ckpt_dir = f'savedModels\{model_init.model_backbone.__class__.__name__}'
 optimizer = nnx.Optimizer(model_init, optax.adam(0.001))
 metrics = nnx.MultiMetric(loss=nnx.metrics.Average('loss'))
 

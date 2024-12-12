@@ -53,9 +53,10 @@ def generate_sequence(model:nnx.Module, batch: Dict[str, jnp.ndarray]) -> Tuple[
 
 
 
+
 def loss_fn(model: nnx.Module, 
             encoder_inputs: jnp.ndarray, 
-            decoder_inputs: jnp.ndarray, 
+            decoder_inputs: Optional[jnp.ndarray], 
             targets: jnp.ndarray, 
             mask: Optional[jnp.ndarray]) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
@@ -73,11 +74,15 @@ def loss_fn(model: nnx.Module,
             - loss: Scalar loss value.
             - logits: Model predictions of shape (batch_size, seq_length, vocab_size).
     """
-    logits = model(encoder_inputs, decoder_inputs, mask)
+    if decoder_inputs != None:
+        logits = model(encoder_inputs, decoder_inputs, mask)
+    else:
+        logits = model(encoder_inputs, mask)
+
     loss = optax.softmax_cross_entropy(logits=logits, labels=targets).mean()
     return loss, logits
 
-def transformer_loss_fn(logits: jnp.ndarray, 
+def transformer_val_loss_fn(logits: jnp.ndarray, 
             targets: jnp.ndarray, 
             ) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
@@ -124,14 +129,24 @@ def train_step(model: nnx.Module,
             - loss: Scalar loss value for the batch.
             - logits: Model predictions after applying the sigmoid activation.
     """
-    grad_fn = nnx.value_and_grad(loss_fn, has_aux=True)
-    (loss, logits), grads = grad_fn(
-        model, 
-        batch['encoder_inputs'], 
-        batch['decoder_inputs'], 
-        batch['targets'], 
-        mask=mask
-    )
+    if model.model_backbone.__class__.__name__ == 'Transformer':
+        grad_fn = nnx.value_and_grad(loss_fn, has_aux=True)
+        (loss, logits), grads = grad_fn(
+            model, 
+            batch['encoder_inputs'], 
+            batch['decoder_inputs'], 
+            batch['targets'], 
+            mask=mask
+        )
+    else:
+        grad_fn = nnx.value_and_grad(loss_fn, has_aux=True)
+        (loss, logits), grads = grad_fn(
+            model, 
+            batch['encoder_inputs'], 
+            None, 
+            batch['targets'], 
+            mask=mask
+        )
     metrics.update(loss=loss, logits=logits, labels=batch['targets'])
     optimizer.update(grads)
     return loss, nnx.softmax(logits)
@@ -161,7 +176,7 @@ def eval_step(model: nnx.Module,
     if model.model_backbone.__class__.__name__ == 'Transformer':
         preds, output = generate_sequence(model, batch)
 
-        loss, logits = transformer_loss_fn(
+        loss, logits = transformer_val_loss_fn(
             output,
             batch['targets'], 
         )
@@ -169,7 +184,7 @@ def eval_step(model: nnx.Module,
         loss, logits = loss_fn(
         model, 
         batch['encoder_inputs'], 
-        batch['decoder_inputs'], 
+        None, 
         batch['targets'], 
         mask=mask
     )
@@ -200,7 +215,8 @@ def pred_step(model: nnx.Module,
     if model.model_backbone.__class__.__name__ == 'Transformer':
         preds, output = generate_sequence(model, batch)
     else:
-        raise NotImplementedError
+        preds = nnx.softmax(model(batch['encoder_inputs'], None))
+        preds = preds.argmax(axis=-1)
     
 
     return preds
