@@ -16,19 +16,20 @@ The codebase is designed to demonstrate modularity and scalability, making it ea
 ```bash
 TransformerNNX/
 ├── model/
-│   ├── __init__.py               # Module initialization
 │   ├── architecture.py           # Neural network architectures 
 │   └── utils.py                  # Helper functions for models
 ├── data/
 │   ├── __init__.py               # Module initialization
 │   ├── reverse_task_data.py      # reverse list dataset
+│   ├── copy_task_data.py         # copy list dataset
+│   ├── utils.py                  # Helper functions for models
 ├── training/
 │   ├── __init__.py               # Module initialization
 │   └── trainer.py                # Training logic and loops
 ├── checkpoints/
 │   └── checkpoint_manager.py     # Save and load model checkpoints
 ├── evaluation/
-│   └── 🚧 evaluator.py              # [TODO] Functions for model evaluation
+│   └── 🚧 evaluator.py          # [TODO] Functions for model evaluation
 ├── tests/
 │   ├── test_CrossMultiHeadAttention.py             
 │   ├── test_DecoderBlock.py             
@@ -39,9 +40,8 @@ TransformerNNX/
 │   ├── test_Transformer.py        
 │   ├── test_TransformerEncoder.py        
 │   ├── test_TransformerDecoder.py        
-├── tasks/                        # Task-specific logics
-│   ├── __init__.py               # Module initialization
-│   ├── reverse_task.py           # reverse input list
+├── tasks/                                    # Task-specific logics
+│   ├── transformer_seq2seq_task.py           # reverse input list
 ├── main.py                       # Main entry point for training and evaluation
 ├── config.py                     # Configuration settings
 └── README.md                     # Project documentation
