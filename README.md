@@ -6,7 +6,7 @@ This repository contains a collection of deep learning projects and experiments 
 The codebase is designed to demonstrate modularity and scalability, making it easy to extend and adapt for different use cases.
 
 ## Features
-- **Custom Transformer Architecture:** Includes MultiHeadAttention, CrossMultiHeadAttention, PositionalEncoding, Decoder, and Encoder blocks.
+- **Custom Transformer Architecture:** Includes MultiHeadAttention, CrossMultiHeadAttention, PositionalEncoding, RelativePositionalEncoding, Decoder, and Encoder blocks.
 - **Modular Codebase:** Clear separation between model definition, data loading, training, and evaluation.
 - **Tests Included:** Unit tests for each core module.
 - **Checkpointing:** Save and load models efficiently with robust checkpoint management.
@@ -19,13 +19,12 @@ TransformerNNX/
 │   ├── architecture.py           # Neural network architectures 
 │   └── utils.py                  # Helper functions for models
 ├── data/
-│   ├── __init__.py               # Module initialization
 │   ├── reverse_task_data.py      # reverse list dataset
 │   ├── copy_task_data.py         # copy list dataset
-│   ├── utils.py                  # Helper functions for models
+│   └── utils.py                  # Helper functions for models
 ├── training/
-│   ├── __init__.py               # Module initialization
-│   └── trainer.py                # Training logic and loops
+│   ├── trainer.py                # Training logic and loops
+│   └── utils.py                  # Helper functions
 ├── checkpoints/
 │   └── checkpoint_manager.py     # Save and load model checkpoints
 ├── evaluation/
@@ -39,9 +38,9 @@ TransformerNNX/
 │   ├── test_scaled_dot_product.py             
 │   ├── test_Transformer.py        
 │   ├── test_TransformerEncoder.py        
-│   ├── test_TransformerDecoder.py        
-├── tasks/                                    # Task-specific logics
-│   ├── transformer_seq2seq_task.py           # reverse input list
+│   └── test_TransformerDecoder.py        
+├── tasks/                        # Task-specific logics
+│   ├── seq2seq_task.py           # reverse input list
 ├── main.py                       # Main entry point for training and evaluation
 ├── config.py                     # Configuration settings
 └── README.md                     # Project documentation
