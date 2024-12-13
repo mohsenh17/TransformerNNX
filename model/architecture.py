@@ -35,11 +35,36 @@ def compute_positional_encoding(d_model: int, max_seq_len: int = 512) -> jnp.nda
     
     return pe
 
+import jax.numpy as jnp
+
+def compute_relative_positional_encoding(max_seq_len: int) -> jnp.ndarray:
+    """
+    Computes the relative positional encoding for a sequence of given length.
+
+    Args:
+        max_seq_len (int): The maximum sequence length.
+
+    Returns:
+        jnp.ndarray: A 2D array of shape (max_seq_len, max_seq_len) representing
+                     the relative positional encoding.
+    """
+    # Create the positional indices
+    pe = jnp.arange(max_seq_len)
+    
+    # Compute the relative positional encoding (RPE)
+    rpe = pe - pe[:, jnp.newaxis]  # Shape: (max_seq_len, max_seq_len)
+    
+    # Offset the RPE to ensure non-negative values
+    rpe += max_seq_len
+    
+    return rpe
+
 def scaled_dot_product(
     q: jnp.ndarray, 
     k: jnp.ndarray, 
     v: jnp.ndarray, 
-    mask: Optional[jnp.ndarray] = None
+    mask: Optional[jnp.ndarray] = None,
+    rpem: Optional[jnp.ndarray] = None
 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
     Compute scaled dot-product attention.
@@ -57,6 +82,10 @@ def scaled_dot_product(
     d_k = q.shape[-1]  # Dimensionality of key vectors
     attn_logits = jnp.matmul(q, jnp.swapaxes(k, -2, -1))  # Compute attention logits
     attn_logits = attn_logits / jnp.sqrt(d_k)  # Scale by sqrt(d_k)
+
+    if rpem is not None:
+        bias = jnp.einsum("bhsd,hskd->bhsk", q, rpem) 
+        attn_logits = attn_logits + bias
 
     if mask is not None:
         attn_logits = jnp.where(mask == 0, -1e9, attn_logits)  # Apply mask with large negative value
@@ -117,6 +146,59 @@ class PositionalEncoding(nnx.Module):
         pe = compute_positional_encoding(self.d_model, self.max_seq_len)
         return x + pe[:, :x.shape[1]]
 
+class XLRelativePositionalEncoding(nnx.Module):
+    """
+    A module for computing relative positional encodings for input sequences.
+    This is typically used in transformer models to provide information about
+    the relative position of tokens in a sequence.
+
+    Relative positional encoding helps a model identify the relative distance
+    between tokens, enabling the attention mechanism to understand sequence
+    order without absolute positional embeddings.
+
+    Attributes:
+        embedding (nnx.Embed): A trainable embedding layer that maps relative
+                               positions to embeddings of shape 
+                               (2 * max_seq_len - 1, d_model).
+
+    Args:
+        d_model (int): The dimensionality of the model (embedding size).
+        max_seq_len (int): The maximum sequence length that the positional encodings
+                           will support.
+        rngs (nnx.Rngs): Random number generators for initializing the embedding weights.
+
+    Methods:
+        __call__(): Returns the relative positional embeddings for all token pairs.
+    """
+    def __init__(self, 
+                 d_model: int, 
+                 max_seq_len: int=512, 
+                 *, rngs: nnx.Rngs):
+        """
+        Initializes the relative positional encoding module.
+
+        Args:
+            d_model (int): The dimensionality of the model (embedding size).
+            max_seq_len (int): The maximum sequence length that the positional encodings
+                               will support.
+            rngs (nnx.Rngs): Random number generators for reproducibility.
+        """
+        self.d_model = d_model
+        # Trainable embedding layer for relative positions
+        self.embedding = nnx.Embed(2*max_seq_len-1, d_model, rngs=rngs) # shape: (2*max_seq_len-1, d_model)
+
+
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        """
+        Computes the relative positional encodings for a sequence.
+
+        Returns:
+            jnp.ndarray: A tensor of shape (max_seq_len, max_seq_len, d_model)
+                         containing relative positional embeddings for all token pairs.
+        """
+        seq_len = x.shape[1]
+        rpe = compute_relative_positional_encoding(seq_len)
+        return self.embedding(rpe) # shape: (max_seq_len, max_seq_len, d_model)
 
 class MultiHeadAttention(nnx.Module):
     """
@@ -138,7 +220,7 @@ class MultiHeadAttention(nnx.Module):
     def __init__(self, 
                  embed_dim: int, 
                  num_heads:int, 
-                 #relative_positional_encoding_flag: bool = False,
+                 relative_positional_encoding_flag: bool = False,
                  *, rngs: nnx.Rngs) -> None:
         """
         Initializes the MultiHeadAttention module.
@@ -154,11 +236,11 @@ class MultiHeadAttention(nnx.Module):
         """
         self.num_heads = num_heads
         #self.rngs = rngs
-        #self.rpef = relative_positional_encoding_flag
+        self.rpef = relative_positional_encoding_flag
         self.qkv_projection = nnx.Linear(embed_dim, 3 * embed_dim, rngs=rngs)
         self.out_projection = nnx.Linear(embed_dim, embed_dim, rngs=rngs)
-        #if self.rpef:
-        #    rpem = XLRelativePositionalEncoding(embed_dim, seq_len, rngs=self.rngs)
+        if self.rpef:
+            self.rpem = XLRelativePositionalEncoding(embed_dim, rngs=rngs)
         
         
 
@@ -183,10 +265,12 @@ class MultiHeadAttention(nnx.Module):
             - Output tensor of shape `(batch_size, seq_len, embed_dim)`.
             - Attention weights tensor of shape `(batch_size, num_heads, seq_len, seq_len)`.
         """
+        rpem = None
         batch_size, seq_len, embed_dim = x.shape
         if mask is not None:
             mask = utils.expand_mask(mask)  # Ensure mask is in the correct 4D format
-        
+        if self.rpef:
+            rpem = self.rpem(x).reshape(self.num_heads, seq_len, seq_len, -1)
         # Compute query, key, and value projections
         qkv = self.qkv_projection(x)  # Shape: (batch_size, seq_len, 3 * embed_dim)
         qkv = qkv.reshape(batch_size, seq_len, self.num_heads, -1)  # Split heads
@@ -194,7 +278,7 @@ class MultiHeadAttention(nnx.Module):
         q, k, v = jnp.array_split(qkv, 3, axis=-1)  # Split into query, key, value
         
         # Compute scaled dot-product attention
-        values, attention = scaled_dot_product(q, k, v, mask)  # Custom function
+        values, attention = scaled_dot_product(q, k, v, mask, rpem)  # Custom function
         
         # Reshape and project output
         values = values.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, -1)
@@ -227,8 +311,9 @@ class EncoderBlock(nnx.Module):
                  feedforward_dim: int, 
                  dropout_prob: float, 
                  num_heads: int,
+                 relative_positional_encoding_flag: bool = False,
                  *, rngs: nnx.Rngs):
-        self.mha = MultiHeadAttention(embed_dim=input_dim, num_heads=num_heads, rngs=rngs)
+        self.mha = MultiHeadAttention(input_dim, num_heads,relative_positional_encoding_flag, rngs=rngs)
         self.linear = [
             nnx.Linear(input_dim, feedforward_dim, rngs=rngs),
             nnx.Dropout(dropout_prob, rngs=rngs),
@@ -293,9 +378,10 @@ class TransformerEncoder(nnx.Module):
                  num_blocks: int, 
                  dropout_prob: float, 
                  num_heads: int,
+                 relative_positional_encoding_flag: bool = False,
                  *, rngs: nnx.Rngs):    
         self.blocks = [
-            EncoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, rngs=rngs) 
+            EncoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, relative_positional_encoding_flag, rngs=rngs) 
             for _ in range(num_blocks)
         ]
 
@@ -322,7 +408,7 @@ class TransformerEncoder(nnx.Module):
 
     def get_attention_weights(self, 
                               x: jnp.ndarray, 
-                              mask: Optional[jnp.ndarray] = None
+                              mask: Optional[jnp.ndarray] = None,
                               ) -> List[jnp.ndarray]:
         """
         Extracts the attention weights from each encoder block.
@@ -452,11 +538,12 @@ class DecoderBlock(nnx.Module):
                  feedforward_dim: int,
                  dropout_prob: float,
                  num_heads: int,
+                 relative_positional_encoding_flag: bool = False,
                  *, rngs: nnx.Rngs) -> None:
         """
         Initializes the DecoderBlock module.
         """
-        self.mha = MultiHeadAttention(input_dim,num_heads, rngs=rngs)  # Self-attention
+        self.mha = MultiHeadAttention(input_dim,num_heads,relative_positional_encoding_flag, rngs=rngs)  # Self-attention
         self.cmha = CrossMultiHeadAttention(input_dim, num_heads, rngs=rngs)  # Cross-attention
         self.linear = [
             nnx.Linear(input_dim, feedforward_dim, rngs=rngs),
@@ -534,12 +621,13 @@ class TransformerDecoder(nnx.Module):
                  num_blocks: int,
                  dropout_prob: float,
                  num_heads: int,
+                 relative_positional_encoding_flag: bool = False,
                  *, rngs: nnx.Rngs) -> None:
         """
         Initializes the TransformerDecoder module.
         """
         self.blocks = [
-            DecoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads, rngs=rngs)
+            DecoderBlock(input_dim, feedforward_dim, dropout_prob, num_heads,relative_positional_encoding_flag, rngs=rngs)
             for _ in range(num_blocks)
         ]
         self.out_projection = nnx.Linear(input_dim, input_dim, rngs=rngs)
@@ -678,3 +766,8 @@ class Transformer(nnx.Module):
         # Final linear projection
         output = self.out_projection(decoder_output)
         return output
+
+if __name__ == '__main__':
+    pe = XLRelativePositionalEncoding(8, 4, rngs=nnx.Rngs(0))
+    x = jnp.ones((2, 3, 8))
+    print(pe(x).shape)

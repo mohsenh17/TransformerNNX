@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from data.reverse_task_data import ReverseTaskDataset
 from data.utils import custom_collate_fn
 from data.copy_task_data import CopyTaskDataset
-from tasks.seq2seq_task import Seq2SeqTaskTransformerModel, Seq2SeqTaskEncoderModel
+from tasks.seq2seq_task import Seq2SeqTaskTransformerModel, Seq2SeqTaskEncoderModel, Seq2SeqTaskXLEncoderModel
 from training.trainer import TrainerWithEarlyStopping
 from flax import nnx
 import optax
@@ -50,7 +50,8 @@ val_ds = DataLoader(val_set,
 
 # Model and optimizer
 #model = Seq2SeqTaskTransformerModel(input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=nnx.Rngs(0))
-model = Seq2SeqTaskEncoderModel(input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=nnx.Rngs(0))
+#model = Seq2SeqTaskEncoderModel(input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=nnx.Rngs(0))
+model = Seq2SeqTaskXLEncoderModel(input_dim, embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=nnx.Rngs(0))
 ckpt_dir = f'savedModels\{model.model_backbone.__class__.__name__}'
 optimizer = nnx.Optimizer(model, optax.adam(learning_rate))
 metrics = nnx.MultiMetric(loss=nnx.metrics.Average('loss'))
