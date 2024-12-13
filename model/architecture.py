@@ -5,6 +5,36 @@ from flax import nnx
 
 from model import utils
 
+def compute_positional_encoding(d_model: int, max_seq_len: int = 512) -> jnp.ndarray:
+    """
+    Computes the positional encoding for a given sequence length and embedding dimension.
+    
+    Args:
+        d_model (int): The dimension of the model (embedding size).
+        max_seq_len (int): The maximum sequence length for which positional encodings
+                           are computed.
+    
+    Returns:
+        jnp.ndarray: The computed positional encodings of shape (1, max_seq_len, d_model).
+    """
+    # Initialize positional encoding array
+    pe = jnp.zeros((max_seq_len, d_model))
+    
+    # Create position indices for the sequence
+    position = jnp.arange(0, max_seq_len, dtype=jnp.float32)[:, jnp.newaxis]
+    
+    # Calculate the division term for the sine and cosine functions
+    div_term = jnp.exp(jnp.arange(0, d_model, 2) * (jnp.log(10000.0) / d_model))  # exp(log(x)) = x
+    
+    # Apply the sine and cosine functions to even and odd indices
+    pe = pe.at[:, 0::2].set(jnp.sin(position / div_term))
+    pe = pe.at[:, 1::2].set(jnp.cos(position / div_term))
+    
+    # Expand the positional encoding to have a batch dimension
+    pe = jnp.expand_dims(pe, axis=0)
+    
+    return pe
+
 def scaled_dot_product(
     q: jnp.ndarray, 
     k: jnp.ndarray, 
@@ -35,6 +65,58 @@ def scaled_dot_product(
     values = jnp.matmul(attention, v)  # Compute weighted values
     return values, attention
 
+class PositionalEncoding(nnx.Module):
+    """
+    A module for computing positional encodings for input sequences.
+    This is typically used in transformer models to provide information about
+    the relative or absolute position of tokens in a sequence.
+
+    Args:
+        d_model (int): The dimension of the model (embedding size).
+        max_seq_len (int): The maximum sequence length that the positional encodings
+                           will support.
+        rngs (nnx.Rngs): Random number generators for reproducibility.
+    
+    Attributes:
+        pe (jnp.ndarray): The computed positional encodings of shape (1, max_seq_len, d_model).
+
+    Methods:
+        __call__(x: jnp.ndarray) -> jnp.ndarray:
+            Adds the positional encodings to the input sequence.
+    """
+    
+    def __init__(self, 
+                 d_model: int, 
+                 max_seq_len: int=512, 
+                 *, rngs: nnx.Rngs):
+        """
+        Initializes the PositionalEncoding module.
+
+        Args:
+            d_model (int): The dimension of the model (embedding size).
+            max_seq_len (int): The maximum sequence length for which positional
+                               encodings are computed.
+            rngs (nnx.Rngs): Random number generators for reproducibility.
+        """
+        # Initialize positional encoding array
+        self.d_model = d_model
+        self.max_seq_len = max_seq_len
+        
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        """
+        Adds the positional encodings to the input sequence.
+
+        Args:
+            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, d_model).
+
+        Returns:
+            jnp.ndarray: Output tensor with positional encodings added, of shape
+                         (batch_size, seq_len, d_model).
+        """
+        # Add positional encodings to the input sequence
+        pe = compute_positional_encoding(self.d_model, self.max_seq_len)
+        return x + pe[:, :x.shape[1]]
+
 
 class MultiHeadAttention(nnx.Module):
     """
@@ -53,7 +135,11 @@ class MultiHeadAttention(nnx.Module):
         Computes the multi-head attention output for the input tensor `x` with the given number of heads.
     """
 
-    def __init__(self, embed_dim: int, num_heads:int, *, rngs: nnx.Rngs) -> None:
+    def __init__(self, 
+                 embed_dim: int, 
+                 num_heads:int, 
+                 #relative_positional_encoding_flag: bool = False,
+                 *, rngs: nnx.Rngs) -> None:
         """
         Initializes the MultiHeadAttention module.
 
@@ -67,12 +153,18 @@ class MultiHeadAttention(nnx.Module):
             Random number generators for initializing weights of the projection layers.
         """
         self.num_heads = num_heads
+        #self.rngs = rngs
+        #self.rpef = relative_positional_encoding_flag
         self.qkv_projection = nnx.Linear(embed_dim, 3 * embed_dim, rngs=rngs)
         self.out_projection = nnx.Linear(embed_dim, embed_dim, rngs=rngs)
+        #if self.rpef:
+        #    rpem = XLRelativePositionalEncoding(embed_dim, seq_len, rngs=self.rngs)
+        
+        
 
     def __call__(self, 
                  x: jnp.ndarray, 
-                 mask: Optional[jnp.ndarray] = None
+                 mask: Optional[jnp.ndarray] = None,
                  ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """
         Applies the multi-head attention mechanism.
@@ -252,69 +344,6 @@ class TransformerEncoder(nnx.Module):
             attention_weights.append(attention_weight)
         return attention_weights
 
-
-class PositionalEncoding(nnx.Module):
-    """
-    A module for computing positional encodings for input sequences.
-    This is typically used in transformer models to provide information about
-    the relative or absolute position of tokens in a sequence.
-
-    Args:
-        d_model (int): The dimension of the model (embedding size).
-        max_seq_len (int): The maximum sequence length that the positional encodings
-                           will support.
-        rngs (nnx.Rngs): Random number generators for reproducibility.
-    
-    Attributes:
-        pe (jnp.ndarray): The computed positional encodings of shape (1, max_seq_len, d_model).
-
-    Methods:
-        __call__(x: jnp.ndarray) -> jnp.ndarray:
-            Adds the positional encodings to the input sequence.
-    """
-    
-    def __init__(self, 
-                 d_model: int, 
-                 max_seq_len: int, 
-                 *, rngs: nnx.Rngs):
-        """
-        Initializes the PositionalEncoding module.
-
-        Args:
-            d_model (int): The dimension of the model (embedding size).
-            max_seq_len (int): The maximum sequence length for which positional
-                               encodings are computed.
-            rngs (nnx.Rngs): Random number generators for reproducibility.
-        """
-        # Initialize positional encoding array
-        pe = jnp.zeros((max_seq_len, d_model))
-        
-        # Create position indices for the sequence
-        position = jnp.arange(0, max_seq_len, dtype=jnp.float32)[:, jnp.newaxis]
-        
-        # Calculate the division term for the sine and cosine functions
-        div_term = jnp.exp(jnp.arange(0, d_model, 2) * (jnp.log(10000) / d_model)) # exp(log(x)) = x !
-        
-        # Apply the sine and cosine functions to even and odd indices
-        pe = pe.at[:, 0::2].set(jnp.sin(position / div_term))
-        pe =pe.at[:, 1::2].set(jnp.cos(position / div_term))
-        
-        # Expand the positional encoding to have a batch dimension
-        self.pe = jnp.expand_dims(pe, axis=0)
-
-    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
-        """
-        Adds the positional encodings to the input sequence.
-
-        Args:
-            x (jnp.ndarray): Input tensor of shape (batch_size, seq_len, d_model).
-
-        Returns:
-            jnp.ndarray: Output tensor with positional encodings added, of shape
-                         (batch_size, seq_len, d_model).
-        """
-        # Add positional encodings to the input sequence
-        return x + self.pe[:, :x.shape[1]]
 
 
 class CrossMultiHeadAttention(nnx.Module):

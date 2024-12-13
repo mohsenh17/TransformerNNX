@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 from typing import Optional
 from flax import nnx
-from model.architecture import Transformer, TransformerEncoder, TransformerDecoder
+from model.architecture import compute_positional_encoding, PositionalEncoding, Transformer, TransformerEncoder, TransformerDecoder
 
 class Seq2SeqTaskTransformerModel(nnx.Module):
     """
@@ -42,6 +42,7 @@ class Seq2SeqTaskTransformerModel(nnx.Module):
             rngs (nnx.Rngs): Random number generators for initialization.
         """
         self.embd_projection = nnx.Linear(input_dim, embed_dim, rngs=rngs)
+        self.positional_encoding = PositionalEncoding(embed_dim, rngs=rngs)
         self.model_backbone  = Transformer(embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=rngs)
         self.output_projection = nnx.Linear(embed_dim, input_dim, rngs=rngs)
 
@@ -66,7 +67,9 @@ class Seq2SeqTaskTransformerModel(nnx.Module):
             jnp.ndarray: Output logits, shape `(batch_size, tgt_seq_length, input_dim)`.
         """
         x = self.embd_projection(x)
+        x = self.positional_encoding(x)
         y = self.embd_projection(y)
+        y = self.positional_encoding(y)
         out = self.model_backbone(x, y, mask)
         out = self.output_projection(out)
         return out
@@ -110,7 +113,8 @@ class Seq2SeqTaskEncoderModel(nnx.Module):
             num_heads (int): Number of attention heads.
             rngs (nnx.Rngs): Random number generators for initialization.
         """
-        self.embd_projection = nnx.Linear(input_dim, embed_dim, rngs=rngs)
+        self.embed_projection = nnx.Linear(input_dim, embed_dim, rngs=rngs)
+        self.positional_encoding = PositionalEncoding(embed_dim, rngs=rngs)
         self.model_backbone  = TransformerEncoder(embed_dim, feedforward_dim, num_blocks, dropout_prob, num_heads, rngs=rngs)
         self.output_projection = nnx.Linear(embed_dim, input_dim, rngs=rngs)
 
@@ -131,7 +135,8 @@ class Seq2SeqTaskEncoderModel(nnx.Module):
         Returns:
             jnp.ndarray: Output logits, shape `(batch_size, tgt_seq_length, input_dim)`.
         """
-        x = self.embd_projection(x)
+        x = self.embed_projection(x)
+        x = self.positional_encoding(x)
         out = self.model_backbone(x, mask)
         out = self.output_projection(out)
         return out
