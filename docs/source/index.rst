@@ -91,8 +91,6 @@ Each plays a distinct role in sequence-to-sequence tasks like machine translatio
 -------------------------------
 **Diagram of the Transformer**
 -------------------------------
-rtast  rgsdgvfzdg sdfkjgdfo ij odfgjodfj oidfjgoidfj oidfjgoisdfjoijvozx ojsojsfgo
-
 
 .. image:: transformer.png
    :width: 50%
