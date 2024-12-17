@@ -49,7 +49,7 @@ This design eliminates the sequential bottleneck and significantly accelerates t
 
 
 ===========================================
-**2. High-Level Transformer Architecture**
+**High-Level Transformer Architecture**
 ===========================================
 
 The transformer architecture consists of two main components: the **encoder** and the **decoder**. 
@@ -126,6 +126,9 @@ Each plays a distinct role in sequence-to-sequence tasks like machine translatio
 
 
 
+***************
+Bibliography
+***************
 
 .. bibliography::
    :cited:
