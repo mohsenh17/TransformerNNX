@@ -1,5 +1,6 @@
 # Transformer with flax.nnx
 
+*The complete documentation:* https://transformernnx.readthedocs.io/en/latest/
 ## Overview
 This repository contains a collection of deep learning projects and experiments built using Flax and JAX. The primary focus is on implementing, training, and evaluating Transformer architecture.
 
