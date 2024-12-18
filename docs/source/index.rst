@@ -120,9 +120,9 @@ Each plays a distinct role in sequence-to-sequence tasks like machine translatio
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents
+   :caption: Core Building Blocks
 
-   api/architecture.rst
+   api/Positional_encoding.ipynb
 
 
 

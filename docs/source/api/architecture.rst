@@ -1,5 +1,39 @@
-architecture module
+Architecture
 ===================
+
+In this section, we break down the transformer into its key components, 
+explaining the function, theory, and implementation of each.
+
+====================
+Positional Encoding
+====================
+
+Transformers, unlike RNNs, do not process tokens sequentially. 
+They operate on the entire sequence simultaneously, so they lack inherent information 
+about the order of tokens. Positional encoding injects this information into the input embeddings.
+
+-----------------------------
+Absolute Positional Encoding
+-----------------------------
+
+The original transformer model introduces a sinusoidal positional encoding:
+
+* Alternates between sine and cosine functions for even and odd dimensions.
+* Encodes each position as a vector:
+
+.. math::
+   PE_{\text{pos}, 2i} = \sin\left(\frac{\text{pos}}{10000^{\frac{2i}{d}}}\right), \quad
+   PE_{\text{pos}, 2i+1} = \cos\left(\frac{\text{pos}}{10000^{\frac{2i}{d}}}\right)
+   
+   
+Where :math:`pos` is the position and :math:`i` is the dimension index.
+
+
+
+
+
+
+
 
 # Transformer Documentation
 
