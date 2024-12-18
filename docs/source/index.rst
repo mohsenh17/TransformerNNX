@@ -112,8 +112,7 @@ Each plays a distinct role in sequence-to-sequence tasks like machine translatio
 
 * **Scalability**: Handles large datasets and models efficiently.
 * **Flexibility**: Extensible to tasks beyond NLP, such as vision and reinforcement learning.
-* **Effectiveness**: Achieves state-of-the-art results in diverse tasks by capturing both 
-   local and global dependencies in data.
+* **Effectiveness**: Achieves state-of-the-art results in diverse tasks by capturing both local and global dependencies in data.
 
 
 
