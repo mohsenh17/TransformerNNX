@@ -122,6 +122,7 @@ Each plays a distinct role in sequence-to-sequence tasks like machine translatio
    :caption: Core Building Blocks
 
    api/Positional_encoding.ipynb
+   api/Encoder
 
 
 
