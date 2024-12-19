@@ -21,6 +21,7 @@ extensions = [
     'sphinx.ext.viewcode',      # Links to source code
     'nbsphinx',                 # Render Jupyter Notebooks
     'sphinxcontrib.bibtex',     # For BibTeX citations
+    'sphinx_rtd_theme',         # ReadTheDocs theme
 ]
 
 templates_path = ['_templates']
@@ -34,6 +35,7 @@ exclude_patterns = []
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 highlight_language = 'python3'
+nbsphinx_codecell_lexer = 'ipython'  # Use 'ipython' for highlighting code cells
 
 # -- bibtex configuration ----------------------------------------------------
 bibtex_bibfiles = ['ref.bib']
